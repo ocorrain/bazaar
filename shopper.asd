@@ -12,7 +12,8 @@
 	       :alexandria
 	       :local-time
 	       :url-rewrite
-	       :lisp-magick
+	    ;  :lisp-magick
+	       :cl-gd
 	       :cl-fad
 	       :drakma
 	       :md5

@@ -1,8 +1,33 @@
 (in-package #:shopper)
 
 (restas:define-module #:shopper-edit
-    (:use #:cl #:shopper #:restas #:alexandria)
-  (:decorators '@http-auth-require))
+  (:use #:cl #:shopper #:restas #:alexandria)
+  ;; (:decorators '@http-auth-require)
+  (:export #:r/edit
+
+	   #:store/edit/parameters
+
+	   #:geo/edit/postage
+	   #:geo/edit 
+	   #:geo/delete
+
+	   #:/r/edit
+	   #:r/delete-item 
+
+	   #:r/edit-item/view 
+	   #:r/edit-item/edit 
+	   #:r/edit-item/images 
+	   #:r/edit-item/tags 
+	   #:r/edit-item/contents 
+	   #:r/edit-item/images 
+
+	   #:r/edit-tag/view 
+	   #:r/edit-tag/edit 
+
+	   #:new-static-content
+	   #:static-content-edit 
+	   #:static-content-delete))
+
 
 (in-package #:shopper-edit)
 

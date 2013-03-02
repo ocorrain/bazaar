@@ -2,7 +2,8 @@
 
 (restas:define-module #:shopper-login
     (:use #:cl #:shopper #:restas #:alexandria)
-  (:decorators '@https-require))
+  ;; (:decorators '@https-require)
+  )
 
 (in-package #:shopper-login)
 

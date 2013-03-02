@@ -17,40 +17,66 @@
 ;; 	      (lisp-magick:magick-scale-image wand (truncate (* a height)) height)))
 ;; 	(lisp-magick:magick-write-image wand thumbname))))
 
+(defun create-thumbnail (source-path dest-path box-x box-y &optional (frame-color (list 0 0 0)))
+  (cl-gd:with-image-from-file (img source-path)
+    (multiple-value-bind (image-x image-y)
+	(cl-gd:image-size img)
+      (multiple-value-bind (new-x new-y)
+	  (get-resize-dimensions image-x image-y box-x box-y)
+	(cl-gd:with-image (new new-x new-y t)
+	  (cl-gd:copy-image img new 0 0 0 0 image-x image-y
+			    :resize t :resample t
+			    :dest-width new-x :dest-height new-y)
+	  (cl-gd:write-image-to-file dest-path
+				     :if-exists :supersede
+				     :image new))
+	(values new-x new-y)))))
 
-(defun create-thumbnail (filename thumbname width height &optional (frame-color (list 0 0 0)))
-  "Create a thumbnail the image in FILENAME with a max size of WIDTH x HEIGHT
-pixel (but with the original aspect ratio) and save it in THUMBNAME."
-  (if (or (pathnamep filename)
-	  (pathnamep thumbname))
-      (create-thumbnail (namestring filename) (namestring thumbname) width height)
-      (lisp-magick:with-magick-wand (wand :load filename)
-	(lisp-magick:with-pixel-wand (pwand :comp (255 255 255))
-	  (multiple-value-bind (new-width new-height padding-width padding-height)
-	      (get-thumbnail-dimensions (lisp-magick:magick-get-image-width wand)
-					(lisp-magick:magick-get-image-height wand)
-					width height)
-	    (lisp-magick:magick-scale-image wand new-width new-height)
-	    (lisp-magick:magick-frame-image wand pwand 
-	    				    padding-width
-	    				    padding-height
-	    				    0 0))
+(defun get-resize-dimensions (image-x image-y box-x box-y)
+  (if (and (< image-x box-y)
+	   (< image-y box-y))
+      (values image-x image-y)
+      (apply #'values
+	     (mapcar #'round
+		     (if (> (/ image-x image-y) (/ box-x box-y))
+			 (list box-x (* image-y (/ box-x image-x)))
+			 (list (* image-x (/ box-y image-y)) box-y))))))
+
+
+
+;; (defun create-thumbnail (filename thumbname width height &optional (frame-color (list 0 0 0)))
+;;   "Create a thumbnail the image in FILENAME with a max size of WIDTH x HEIGHT
+;; pixel (but with the original aspect ratio) and save it in THUMBNAME."
+;;   (if (or (pathnamep filename)
+;; 	  (pathnamep thumbname))
+;;       (create-thumbnail (namestring filename) (namestring thumbname) width height)
+;;       (lisp-magick:with-magick-wand (wand :load filename)
+;; 	(lisp-magick:with-pixel-wand (pwand :comp (255 255 255))
+;; 	  (multiple-value-bind (new-width new-height padding-width padding-height)
+;; 	      (get-thumbnail-dimensions (lisp-magick:magick-get-image-width wand)
+;; 					(lisp-magick:magick-get-image-height wand)
+;; 					width height)
+;; 	    (lisp-magick:magick-scale-image wand new-width new-height)
+;; 	    (lisp-magick:magick-frame-image wand pwand 
+;; 	    				    padding-width
+;; 	    				    padding-height
+;; 	    				    0 0))
 	  
-	  (lisp-magick:magick-write-image wand thumbname)))))
+;; 	  (lisp-magick:magick-write-image wand thumbname)))))
 
 
-(defun get-thumbnail-dimensions (width height box-width box-height)
-  (let ((image-aspect (/ width height))
-	(box-aspect (/ box-width box-height)))
-;    (format t "Image aspect: ~A ; box aspect: ~A" image-aspect box-aspect)
-    (let* ((new-width (if (> image-aspect box-aspect)
-			  box-width (truncate (* box-height image-aspect))))
-	   (new-height (if (> image-aspect box-aspect)
-			   (truncate (/ box-width image-aspect)) box-height))
+;; (defun get-thumbnail-dimensions (width height box-width box-height)
+;;   (let ((image-aspect (/ width height))
+;; 	(box-aspect (/ box-width box-height)))
+;; ;    (format t "Image aspect: ~A ; box aspect: ~A" image-aspect box-aspect)
+;;     (let* ((new-width (if (> image-aspect box-aspect)
+;; 			  box-width (truncate (* box-height image-aspect))))
+;; 	   (new-height (if (> image-aspect box-aspect)
+;; 			   (truncate (/ box-width image-aspect)) box-height))
 	   
-	   (padding-width (truncate (/ (- box-width new-width) 2)))
-	   (padding-height (truncate (/ (- box-height new-height) 2))))
-      (values new-width new-height padding-width padding-height))))
+;; 	   (padding-width (truncate (/ (- box-width new-width) 2)))
+;; 	   (padding-height (truncate (/ (- box-height new-height) 2))))
+;;       (values new-width new-height padding-width padding-height))))
 
 (defun get-thumb-url (path)
   (concatenate 'string "/images/"
