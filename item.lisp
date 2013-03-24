@@ -3,7 +3,7 @@
 
 (in-package #:shopper)
 
-(ele:defpclass line-item ()
+(ele:defpclass line-item (cms images-mixin tags-mixin)
   ((title :initarg :title :initform ""
 	  :accessor title :index t
 	  :documentation "Title or name of the line item" :type string)
@@ -25,32 +25,15 @@
 	   :documentation "The weight of the item in grams" :type integer)
    (price :initarg :price :initform 0 :accessor price
 	  :documentation "The price of the item in euro cents" :type integer)
-   (tags :initarg :tags :initform (ele:make-pset)
-	       :accessor tags
-	       :documentation "A list of categories or tags into which
-	       this item falls"
-	       :type list)
+
    (sku  :initarg :sku :initform nil :accessor sku
-	:index t :documentation "Stock-keeping unit ID"
-	:type string)
+	 :index t :documentation "Stock-keeping unit ID"
+	 :type string)
    (meta :initarg :meta :initform '() :accessor meta
 	 :documentation "Meta tags to be added to page for HTML
 	 searchability"
 	 :type list)
-   (featured :initarg :featured :initform nil :accessor featured
-	     :type boolean :index t
-	     :documentation "Is this to be published to the front-page
-	     / featured page?")
-   (published :initarg :published :initform nil
-	      :accessor published :index t
-	      :documentation "Is this to be published to the site?"
-	      :type boolean)
-   (images :initform '() :accessor images
-	   :documentation "List of images of this item"
-	   :type list)
-   (image-counter :initform 0 :accessor image-counter
-		  :documentation "counter for image filenames"
-		  :type number)
+   
    (geographies :initform nil :accessor geographies
 		:documentation "geographies in which this item is available")
    (children-qlist :initform (make-instance 'quantity-list)
@@ -59,6 +42,54 @@
 			  should be a quantity list mapping each child
 			  to the quantity contained in the bundle")))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; High level API
+
+(defmethod get-object ((item (eql :line-item)) sku)
+  (get-item sku))
+
+(defmethod get-all-objects ((item (eql :line-item)))
+  (all-items))
+
+(defmethod get-identifier ((item line-item))
+  (sku item))
+
+(defmethod render-object ((item line-item))
+  (display-item-page item))
+
+(defmethod edit-object/post ((obj line-item) (page (eql :edit)))
+  (update-geos obj (hunchentoot:post-parameters*))
+  (maybe-update obj (fix-alist (hunchentoot:post-parameters*)))
+  (item-form obj))
+
+(defmethod edit-object ((obj line-item) (page (eql :contents)))
+  (bundle-edit-page obj))
+
+(defmethod edit-object/post ((obj line-item) (page (eql :contents)))
+  (maybe-update-bundle obj)
+  (bundle-edit-page obj))
+
+(defmethod get-form ((item (eql :line-item)))
+  (item-form))
+
+(defmethod get-form ((item line-item))
+  (item-form item))
+
+(defmethod get-edit-tabs ((item line-item))
+  '(:view :edit :images :tags :contents))
+
+(defmethod edit-multiple-objects ((item (eql :line-item)) objs)
+  (make-page (labelise item)
+	     (thumbnails objs (lambda (item) (render-thumb item t)))
+	     :sidebar (edit-bar item)))
+
+(defmethod view-object ((obj line-item))
+  (with-html-output-to-string (s)
+    ((:div :class "container")
+     (str (display-item-content obj))
+     (str (display-related-items obj)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun get-item (sku)
   (ele:get-value sku (items *web-store*)))
@@ -69,10 +100,10 @@
 (defgeneric get-weight (item))
 
 
-(defmethod get-next-image-stub ((item line-item))
+(defmethod get-next-image-stub ((obj images-mixin))
   (prog1
-      (format nil "~A_~A" (sku item) (image-counter item))
-    (incf (image-counter item))))
+      (format nil "~A_~A" (get-identifier obj) (image-counter obj))
+    (incf (image-counter obj))))
 
 (defmethod get-edit-view-url ((line-item line-item))
   (restas:genurl 'shopper-edit:r/edit-item/view :sku (sku line-item)))
@@ -112,9 +143,6 @@
 (defmethod get-price ((item line-item))
   (price item))
 
-(defmethod get-view-url ((item line-item))
-  (restas:genurl 'r/view-item :sku (sku item)))
-
 
 (defun item-list->table-form (items item-input-func item-display-func action-url)
   (with-html-output-to-string (s)
@@ -134,4 +162,9 @@
 		     (push v items))
 		   (items *web-store*))
     items))
+
+
+
+
+
 

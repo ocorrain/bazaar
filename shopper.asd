@@ -13,6 +13,7 @@
 	       :local-time
 	       :url-rewrite
 	    ;  :lisp-magick
+	       :trivial-shell
 	       :cl-gd
 	       :cl-fad
 	       :drakma
@@ -30,6 +31,8 @@
 	       (:file "js")
 	       (:file "widgets")
 	       (:file "item")
+	       (:file "artwork")
+	       (:file "gallery")
                (:file "qlist")
 	       (:file "single-item")
 	       (:file "bundle")

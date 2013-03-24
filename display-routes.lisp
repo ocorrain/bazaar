@@ -1,20 +1,31 @@
 (in-package #:shopper)
 
+
+
 (restas:define-route r/index-page
     ("/")
-  (index-page))
+  (display-index-page *web-store*))
 
 (restas:define-route r/featured
     ("/featured")
   (featured-items-page))
 
-(restas:define-route r/view-tag
-    ("/view/tag/:(tag)")
-  (if-let (tag-object (get-tag tag))
-    (basic-page (tag-name tag-object)
-		(tag-display-page tag-object)
-		(tag-name tag-object))
-    hunchentoot:+http-not-found+))
+
+(restas:define-route view-object-page
+    ("/view/:(class)/:(identifier)")
+  (if-let (class-sym (find-cms-class class))
+    (if-let (obj (get-object class-sym identifier))
+      (view-object obj)
+      hunchentoot:+http-not-found+)
+    hunchentoot:+http-bad-request+))
+
+;; (restas:define-route r/view-tag
+;;     ("/view/tag/:(tag)")
+;;   (if-let (tag-object (get-tag tag))
+;;     (basic-page (tag-name tag-object)
+;; 		(tag-display-page tag-object)
+;; 		(tag-name tag-object))
+;;     hunchentoot:+http-not-found+))
 
 (restas:define-route r/shopping-cart/view ("/shopping-cart")
   (store-open-dependent-page #'shopping-cart-page))
@@ -258,11 +269,11 @@
 ;; 	     (with-html-output-to-string (s)
 ;; 	       (:script "$('.carousel').carousel()"))))
 
-(restas:define-route r/view-item
-    ("/view/item/:(sku)")
-  (if-let (item (get-item sku))
-    (view-item-page item)
-    hunchentoot:+http-not-found+))
+;; (restas:define-route r/view-item
+;;     ("/view/item/:(sku)")
+;;   (if-let (item (get-item sku))
+;;     (view-item-page item)
+;;     hunchentoot:+http-not-found+))
 
 (restas:define-route r/view-static-content
     ("/view/static/:(contentform)")

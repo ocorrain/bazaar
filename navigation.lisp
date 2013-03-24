@@ -8,14 +8,25 @@
     ((:div :class "navbar")
      (:img :src "/images/banner.jpg")
      ((:div :class "nav-collapse collapse")
-      (str (nav-tabs (append (main-nav-tabs)
-			     (static-content-nav)
-			     (tag->nav (featured-tags))
-			     (nav-dropdown "More Chocolate!"
-					   (tag->nav (menu-tags)))
-			     (login-tabs))
+      (str (nav-tabs (main-navigation-tabs *web-store*)
 		     navigation :class "nav nav-tabs")))
      (str (navigation-cart)))))
+
+(defmethod main-navigation-tabs ((store-type (eql :web-store)))
+  (append (main-nav-tabs)
+					;			     (static-content-nav)
+	  (tag->nav (featured-tags))
+	  (nav-dropdown "More Chocolate!"
+			(tag->nav (menu-tags)))
+	  (login-tabs)))
+
+(defmethod main-navigation-tabs (store-type)
+  (append (main-nav-tabs)
+					;			     (static-content-nav)
+	  (tag->nav (featured-tags))
+	  (nav-dropdown "More Chocolate!"
+			(tag->nav (menu-tags)))
+	  (login-tabs)))
 
 (defun login-tabs ()
   (when (hunchentoot:session-value :user)

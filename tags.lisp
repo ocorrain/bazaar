@@ -7,7 +7,7 @@
 ;; set of members.  Circularly, line items contain a list of tags that
 ;; are associated with them
 
-(ele:defpclass tag ()
+(ele:defpclass tag (cms)
   ((name :initarg :name :initform "" :accessor tag-name :index t
 	 :documentation "Tag name" :type string)
    (description :initarg :description :initform "" :accessor description)
@@ -15,21 +15,68 @@
    of the tag name for transmission" :type string)
    (members :initarg :members :initform (ele:make-pset) :accessor tag-members
 	    :documentation "Pset of items tagged with this tag")
-   (appears-in-menu :initarg :appears-in-menu :initform nil :accessor appears-in-menu)
-   (featured :initarg :featured :initform nil :accessor featured)))
-
+   (appears-in-menu :initarg :appears-in-menu :initform nil :accessor appears-in-menu)))
 
 (defmethod initialize-instance :after ((instance tag) &rest stuff)
   (declare (ignore stuff))
   (setf (webform instance) (get-webform (tag-name instance))))
 
-(defmethod tag-item ((item line-item) (tag tag))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; High level API
+
+(defmethod get-object ((tag (eql :tag)) webform)
+  (get-tag webform))
+
+(defmethod get-all-objects ((tag (eql :tag)))
+  (all-tags))
+
+(defmethod get-identifier ((tag tag))
+  (webform tag))
+
+(defmethod render-object ((tag tag))
+  (with-html-output-to-string (s)
+    (when (and (description tag) (not (zerop (length (description tag)))))
+      (htm ((:div :class "well") (str (description tag)))))
+    (when-let (thumbs (remove-if-not #'published
+				     (ele:pset-list (tag-members tag))))
+      (str (thumbnails thumbs #'render-thumb)))))
+
+(defmethod edit-object/post ((tag tag) (page (eql :edit)))
+  (maybe-update tag (fix-alist (hunchentoot:post-parameters*)))
+  (edit-object tag :edit))
+
+(defmethod delete-object ((obj tag))
+  (dolist (item (ele:pset-list (tag-members obj)))
+	(untag-item item obj))
+  (ele:drop-instance obj))
+
+(defmethod get-form ((tag (eql :tag)))
+  (tag-form))
+
+(defmethod get-form ((tag tag))
+  (tag-form tag))
+
+
+(defmethod get-edit-tabs ((tag tag))
+  '(:view :edit))
+
+(defmethod edit-multiple-objects ((tag (eql :tag)) objs)
+  (make-page (labelise tag)
+	     (thumbnails objs (lambda (tag) (render-thumb tag t)))
+	     :sidebar (edit-bar tag)))
+
+(defmethod view-object ((obj tag))
+  (tag-display-page obj))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmethod tag-item ((item tags-mixin) (tag tag))
   (ele:with-transaction ()
     (ele:insert-item item (tag-members tag))
     (ele:insert-item tag (tags item))))
 
 
-(defmethod untag-item ((item line-item) (tag tag))
+(defmethod untag-item ((item tags-mixin) (tag tag))
   (ele:remove-item item (tag-members tag))
   (ele:remove-item tag (tags item)))
 
@@ -58,7 +105,7 @@
   (ele:get-instance-by-value 'tag 'webform webform))
 
 (defun get-webform (tag-title)
-  (string-downcase (remove-if-not #'alpha-char-p tag-title)))
+  (string-downcase (remove-if-not #'alphanumericp tag-title)))
 
 (defun tag-widget-printer (item stream)
   ;; FIXME, this is broken somehow
@@ -94,24 +141,24 @@
 ;; (defun get-tag-url (tag)
 ;;   (url-rewrite:add-get-param-to-url "/display-tag" "name" (webform tag)))
 
-(defmethod get-view-url ((tag tag))
-  (restas:genurl 'r/view-tag :tag (webform tag)))
+;; (defmethod get-view-url ((tag tag))
+;;   (restas:genurl 'r/view-tag :tag (webform tag)))
 
 (defun get-tagged-items (tag)
   (ele:pset-list (tag-members tag)))
 
-(defmethod get-tags ((item line-item))
+(defmethod get-tags ((item tags-mixin))
   (ele:pset-list (tags item)))
 
 
 (defmethod get-edit-view-url ((tag tag))
   (restas:genurl 'shopper-edit:r/edit-tag/view :tag (webform tag)))
 
-(defmethod get-edit-edit-url ((tag tag))
-  (restas:genurl 'shopper-edit:r/edit-tag/edit :tag (webform tag)))
+;; (defmethod get-edit-edit-url ((tag tag))
+;;   (restas:genurl 'shopper-edit:r/edit-tag/edit :tag (webform tag)))
 
-(defmethod get-delete-url ((obj line-item))
-  (restas:genurl 'shopper-edit:r/delete-item :sku (sku obj)))
+;; (defmethod get-delete-url ((obj line-item))
+;;   (restas:genurl 'shopper-edit:r/delete-item :sku (sku obj)))
 
 (defun render-tags (list-of-tags)
   (with-html-output-to-string (s)
@@ -150,3 +197,16 @@
 
 
 
+
+;; objects that have tags associated with them
+(defmethod edit-object ((obj tags-mixin) (page (eql :tags)))
+  (when-let (toggle-tag (hunchentoot:get-parameter "tag"))
+    (when-let (toggle-tag-obj (get-tag toggle-tag))
+      (if (tagged? obj toggle-tag-obj)
+	  (untag-item obj toggle-tag-obj)
+	  (tag-item obj toggle-tag-obj))))
+  (make-tags-page obj))
+
+(defmethod delete-object :before ((obj tags-mixin))
+  (dolist (tag (ele:pset-list (tags obj)))
+    (untag-item obj tag)))

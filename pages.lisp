@@ -70,9 +70,7 @@
   (basic-page "Paypal error"
 	      (paypal-errors sent received)))
 
-
-
-(defun index-page ()
+(defmethod display-index-page ((type (eql :web-store)))
   (basic-page (format nil "Welcome to ~A" (store-name *web-store*))
 	      (with-html-output-to-string (s)
 		;; ((:div :class "well")
@@ -109,6 +107,9 @@
 		(:script "$('.carousel').carousel()"))
 	      "Home"))
 
+;; (defun store-index-page ()
+;;   )
+
 (defun get-featured-items (&optional number)
   "If NUMBER is specified, return a list of featured items at most
   NUMBER long, otherwise return all featured items."
@@ -127,25 +128,21 @@
 	     :sidebar (main-site-bar "")))
 
 (defun make-tags-page (item)
-  (make-page
-   (format nil "Tags for ~A" (title item))
-   (concatenate 'string
-		(edit-tabs item "Tags")
-		(with-html-output-to-string (s)
-		  (:h5 "Current tags")
-		  (:p (str (render-tags (ele:pset-list (tags item)))))
-		  (:h5 "Available tags")
-		  (:p (str (render-tags (remove-if (lambda (tag)
-						     (tagged? item tag))
-						   (all-tags)))))))
-   :sidebar (edit-bar "All items")))
+  (concatenate 'string
+	       (with-html-output-to-string (s)
+		 (:h5 "Current tags")
+		 (:p (str (render-tags (ele:pset-list (tags item)))))
+		 (:h5 "Available tags")
+		 (:p (str (render-tags (remove-if (lambda (tag)
+						    (tagged? item tag))
+						  (all-tags))))))))
  
-(defun edit-tag-page (test title)
-  (make-page title
-	     (thumbnails (collect-tags-with test)
-			 (lambda (item)
-			   (render-thumb item t)))
-	     :sidebar (edit-bar title)))
+;; (defun edit-tag-page (test title)
+;;   (make-page title
+;; 	     (thumbnails (collect-tags-with test)
+;; 			 (lambda (item)
+;; 			   (render-thumb item t)))
+;; 	     :sidebar (edit-bar title)))
 
 (defun tag-edit-page (tag)
   (make-page (format nil "Editing ~A" (tag-name tag))
@@ -178,23 +175,20 @@
 					 (pathname-name image))))
 
 (defun image-edit-page (item)
-  (let ((this-url (restas:genurl 'shopper-edit:r/edit-item/images :sku (sku item))))
-    (make-page (format nil "Editing images for ~A" (sku item))
-	       (concatenate 'string
-			    (edit-tabs item "Images")
-			    (image-form item)
-			    (image-thumbnails (images item)
-					      (lambda (image)
-						(with-html-output-to-string (s)
-						  (:img :src (get-thumb-url image))
-						  (:br)
-						  ((:a :class "btn btn-danger"
-						       :href (url-rewrite:add-get-param-to-url
-							      this-url
-							      "delete"
-							      (get-image-number-as-string image)))
-						   "Delete"))))) 
-	       :sidebar (edit-bar "All items"))))
+  (let ((this-url (get-edit-page-url item :images)))
+    (concatenate 'string
+		 (image-form item)
+		 (image-thumbnails (images item)
+				   (lambda (image)
+				     (with-html-output-to-string (s)
+				       (:img :src (get-thumb-url image))
+				       (:br)
+				       ((:a :class "btn btn-danger"
+					    :href (url-rewrite:add-get-param-to-url
+						   this-url
+						   "delete"
+						   (get-image-number-as-string image)))
+					"Delete")))))))
 
 (defun edit-front-page ()
   (make-page
@@ -263,7 +257,7 @@
 	(str (print-price (get-price obj))))
 
     (when edit
-      (htm ((:a :class "btn btn-mini" :href (get-edit-edit-url obj))
+      (htm ((:a :class "btn btn-mini" :href (get-edit-url obj))
 	    "Edit")
 	   ((:a :class "btn btn-mini btn-danger pull-right" :href (get-delete-url obj))
 	    "Delete")))
@@ -285,7 +279,7 @@
     (:p (str (description obj)))
     
     (when edit
-      (htm ((:a :class "btn btn-mini" :href (get-edit-edit-url obj))
+      (htm ((:a :class "btn btn-mini" :href (get-edit-url obj))
 	    "Edit")
 	   ((:a :class "btn btn-mini btn-danger pull-right" :href (get-delete-url obj))
 	    "Delete")))))
@@ -305,7 +299,7 @@
     (:p (str (description obj)))
     
     (when edit
-      (htm ((:a :class "btn btn-mini" :href (get-edit-edit-url obj))
+      (htm ((:a :class "btn btn-mini" :href (get-edit-url obj))
 	    "Edit")
 	   ((:a :class "btn btn-mini btn-danger pull-right"
 		:href (get-delete-url obj))
@@ -319,41 +313,111 @@
     (:p (str (description obj)))))
 
 
-(defmethod get-delete-url ((tag tag))
-  (format nil "/delete/tag/~A" (webform tag)))
+;; (defmethod get-delete-url ((tag tag))
+;;   (format nil "/delete/tag/~A" (webform tag)))
+
+(defun safe-read-from-string (string)
+  (read-from-string (remove #\: string :test #'char-equal)))
 
 
-(defun new-item-page ()
-  (make-page "Create new single item" (item-form)
-	     :sidebar (edit-bar "New item")))
+;; (defun new-item-page ()
+;;   (make-page "Create new single item" (item-form)
+;; 	     :sidebar (edit-bar "New item")))
+;; FIXME: deal with colons and other nasties in the symbols
 
-(defun edit-item-edit-page (item &optional debug)
-  (make-page (format nil "Editing ~A" (sku item))
+(defun find-cms-class (class-string)
+  (let ((symbol (safe-read-from-string class-string)))
+;    (hunchentoot:log-message* :info "~S" class-string)
+    (when (and (symbolp symbol)
+	       (subtypep symbol 'cms))
+      (make-keyword symbol))))
+
+(defun find-object-and-page (class-string identifier page-string)
+  (let ((class (safe-read-from-string class-string))
+	(page (safe-read-from-string page-string)))
+    (if (and (symbolp class) (subtypep class 'cms))
+	(if-let (object (get-object (make-keyword class) identifier))
+	  (if (symbolp page)
+	      (values object (make-keyword page))
+	      hunchentoot:+http-bad-request+)
+	  hunchentoot:+http-not-found+)
+	hunchentoot:+http-bad-request+)))
+
+(defmethod new-object-form (class)
+  (make-page (format nil "create new ~A" (string-downcase class))
+	     (get-form class)
+	     :sidebar (edit-bar (format nil "New ~A" (string-downcase class)))))
+
+;; (defun edit-item-edit-page (item &optional debug)
+;;   (make-page (format nil "Editing ~A" (sku item))
+;; 	     (with-html-output-to-string (s)
+;; 	       (when debug
+;; 		 (htm (:pre (esc (format nil "~S" debug)))))
+;; 	       (str (edit-tabs item "Edit"))
+;; 	       (str (item-form item)))
+;; 	     :sidebar (edit-bar "All items")))
+
+
+
+
+
+(defgeneric get-form (symbol-or-instance))
+
+(defmethod edit-object :around ((obj cms) page)
+  (make-page (format nil "Editing ~A" (get-identifier obj))
 	     (with-html-output-to-string (s)
-	       (when debug
-		 (htm (:pre (esc (format nil "~S" debug)))))
-	       (str (edit-tabs item "Edit"))
-	       (str (item-form item)))
+	       (str (render-edit-tabs obj page))
+	       (str (call-next-method)))
 	     :sidebar (edit-bar "All items")))
 
+(defmethod edit-object/post :around ((obj cms) page)
+  (make-page (format nil "Editing ~A" (get-identifier obj))
+	     (with-html-output-to-string (s)
+	       (hunchentoot:log-message* :error "in edit-object/post")
+	       (str (render-edit-tabs obj page))
+	       (str (call-next-method)))
+	     :sidebar (edit-bar "All items")))
+
+(defmethod new-object (class-sym)
+  (make-page (format nil "Creating new ~A" (labelise class-sym))
+	     (get-form class-sym)
+	     :sidebar (edit-bar "All items")))
+
+(defmethod get-edit-tabs ((store-type (eql :web-store)))
+  (reduce #'append (mapcar (lambda (class)
+			     (list (labelise class)
+				   (cons (get-new-url class) "create new")
+				   (cons (get-multi-edit-url class) "list all")))
+			   (store-active-classes *web-store*))))
+
+(defmethod get-edit-tabs (store-type)
+  (reduce #'append (mapcar (lambda (class)
+			     (list (labelise class)
+				   (cons (get-new-url class) "create new")
+				   (cons (get-multi-edit-url class) "list all")))
+			   (store-active-classes *web-store*))))
+
+;; (defmethod get-edit-tabs ((store-type (eql :web-store)))
+;;   `("Items"
+;;     ("/new/item" . "New item")
+;;     ("/edit/items" . "All items")
+;;     ("/edit/items/published" . "Published items")
+;;     ("/edit/items/unpublished" . "Unpublished items")
+;;     ("/edit/items/featured" . "Featured items")
+;;     "Tags"
+;;     ("/new/tag" . "New tag")
+;;     ("/edit/tags" . "All tags")
+;;     ("/edit/tags/menu" . "Menu tags")
+;;     ("/edit/tags/featured" . "Featured tags")
+;;     "Geo"
+;;     ("/new/geo" . "New geography")
+;;     ("/edit/geos" . "All geographies")
+;;     "Static content"
+;;     ("/new/static" . "New static page")
+;;     ("/edit/all/static" . "All static pages")))
+
 (defun edit-bar (active)
-  (nav-tabs `("Items"
-	      ("/new/item" . "New item")
-	      ("/edit/items" . "All items")
-	      ("/edit/items/published" . "Published items")
-	      ("/edit/items/unpublished" . "Unpublished items")
-	      ("/edit/items/featured" . "Featured items")
-	      "Tags"
-	      ("/new/tag" . "New tag")
-	      ("/edit/tags" . "All tags")
-	      ("/edit/tags/menu" . "Menu tags")
-	      ("/edit/tags/featured" . "Featured tags")
-	      "Geo"
-	      ("/new/geo" . "New geography")
-	      ("/edit/geos" . "All geographies")
-	      "Static content"
-	      ("/new/static" . "New static page")
-	      ("/edit/all/static" . "All static pages"))
+  (nav-tabs (get-edit-tabs *web-store*)
 	    active
 	    :class "nav nav-list"))
 
@@ -421,7 +485,7 @@
     (if (> (length elements) 1)
 	(with-html-output-to-string (s)
 	  ((:div :id carousel-id :class "carousel slide")
-	   ((:div :class "carousel-inner")
+	   ((:div :class "carousel-inner" :style "text-align:center")
 	    (let ((first (car elements)))
 	      (htm ((:div :class "active item")
 		    (str (funcall render-function first)))))

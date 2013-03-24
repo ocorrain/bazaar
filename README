@@ -1,0 +1,31 @@
+edit-front-page
+edit-item-page
+edit-tag-page
+
+new-item-page
+bundle-edit-page
+image-edit-page
+edit-item-edit-page
+tag-display-page
+tag-edit-page
+
+new page new/(class)
+    	 new-object-page class
+edit page edit/(class)/(identifier)  get-object class identifier
+	view edit object obj :view -> render-object obj
+     	edit edit-object obj :edit -> get-form obj
+delete page delete/(class)/(identifier)  get-object class identifier
+       delete-object obj
+
+Basic object obj
+      get-object class identifier
+      get-identifier object
+
+Basic edit object api
+      get-form object or class-keyword
+      delete-object object
+      edit-object object page-keyword
+      edit-object/post object page-keyword
+
+      get-edit-url object
+      get-new-url class-symbol

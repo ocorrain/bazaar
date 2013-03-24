@@ -5,12 +5,12 @@
 
 
 
-(defmethod maybe-create ((type (eql 'tag)) parameters)
+(defmethod maybe-create ((type (eql :tag)) parameters)
   (flet ((assoc-val (val) (cdr (assoc val parameters))))
     (if-let (name (validate-as-string (assoc-val 'name)))
       (let ((webform (get-webform name)))
 	(if-let (tag (get-tag webform))
-	  (restas:redirect 'shopper-edit:r/edit-tag/edit :tag (webform tag))
+	  (hunchentoot:redirect (get-edit-url tag))
 ;	  (hunchentoot:redirect (get-edit-edit-url tag))
 	  (let ((tag (make-instance 'tag :name name)))
 	    (maybe-update tag parameters);;  (when (assoc-val 'appearsinmenu)
@@ -19,9 +19,24 @@
 	    ;;   (setf (featured tag) t))
 	    ;; (when-let (description (validate-as-string (assoc-val 'description)))
 	    ;;   (setf (description tag) description))
-	    (restas:redirect 'shopper-edit:r/edit-tag/edit :tag (webform tag));; (hunchentoot:redirect (get-edit-edit-url tag))
+	    (hunchentoot:redirect (get-edit-url tag));; (hunchentoot:redirect (get-edit-edit-url tag))
 	    )))
-      (hunchentoot:redirect "/new/tag"))))
+      (hunchentoot:redirect (get-new-url :tag)))))
+
+(defmethod maybe-create ((type (eql :geography)) parameters)
+  (flet ((assoc-val (val) (cdr (assoc val parameters))))
+    (if-let (name (assoc-val 'title))
+      (if-let (already-existing (ele:get-instance-by-value 'geography
+							   'geography-name
+							   name))
+	(hunchentoot:redirect (get-edit-url already-existing))
+	(let ((new-geo (make-instance 'geography :name name)))
+	  (setf (geo-members new-geo)
+		(remove-if-not (lambda (p)
+				 (get-country-info-from-iso-code p))
+			       (mapcar #'car (hunchentoot:post-parameters*))))
+	  (hunchentoot:redirect (get-edit-url new-geo))))
+      (hunchentoot:redirect (get-new-url :geography)))))
 
 (defmethod maybe-update ((tag tag) parameters)
   (flet ((assoc-val (val) (cdr (assoc val parameters))))
@@ -35,40 +50,44 @@
 	(setf (appears-in-menu tag) nil))
     (if (assoc-val 'featured)
 	(setf (featured tag) t)
-	(setf (featured tag) nil))))
+	(setf (featured tag) nil))
+    (if (assoc-val 'published)
+	(setf (published tag) t)
+	(setf (published tag) nil))))
 
-(defmethod maybe-create ((type (eql 'item)) parameters)
+(defmethod maybe-create ((type (eql :line-item)) parameters)
   "Object creation template.  Once we have satisfied the minimal
   criteria for an object (the existence of a title), we fill in as
   many other slots as possible and redirect to the object page"
+  (hunchentoot:log-message* :error "in maybe-create item")
   (multiple-value-bind (valid errors) (validate 'single-item parameters)
     (flet ((assoc-val (val) (cdr (assoc val valid))))
       (if-let (title (assoc-val 'title))
 	(let ((item (make-instance 'line-item)))
 	  (set-valid-fields item valid)
 	  (when errors (setf (hunchentoot:session-value 'errors) errors))
-	  (hunchentoot:redirect (get-edit-edit-url item)))))))
+	  (hunchentoot:redirect (get-edit-url item)))))))
 
-(defmethod maybe-create ((type (eql 'single-item)) parameters)
-  "Object creation template.  Once we have satisfied the minimal
-  criteria for an object (the existence of a title), we fill in as
-  many other slots as possible and redirect to the object page"
-  (multiple-value-bind (valid errors) (validate 'single-item parameters)
-    (flet ((assoc-val (val) (cdr (assoc val valid))))
-      (if-let (title (assoc-val 'title))
-	(let ((item (make-instance 'single-item)))
-	  (set-valid-fields item valid)
-	  (when errors (setf (hunchentoot:session-value 'errors) errors))
-	  (hunchentoot:redirect (get-url item)))))))
+;; (defmethod maybe-create ((type (eql 'single-item)) parameters)
+;;   "Object creation template.  Once we have satisfied the minimal
+;;   criteria for an object (the existence of a title), we fill in as
+;;   many other slots as possible and redirect to the object page"
+;;   (multiple-value-bind (valid errors) (validate 'single-item parameters)
+;;     (flet ((assoc-val (val) (cdr (assoc val valid))))
+;;       (if-let (title (assoc-val 'title))
+;; 	(let ((item (make-instance 'single-item)))
+;; 	  (set-valid-fields item valid)
+;; 	  (when errors (setf (hunchentoot:session-value 'errors) errors))
+;; 	  (hunchentoot:redirect (get-url item)))))))
 
-(defmethod maybe-create ((type (eql 'bundle)) parameters)
-  (multiple-value-bind (valid errors) (validate 'bundle parameters)
-    (flet ((assoc-val (val) (cdr (assoc val valid))))
-      (if-let (title (assoc-val 'title))
-	(let ((item (make-instance 'bundle)))
-	  (set-valid-fields item valid)
-	  (when errors (setf (hunchentoot:session-value 'errors) errors))
-	  (hunchentoot:redirect (get-url item)))))))
+;; (defmethod maybe-create ((type (eql 'bundle)) parameters)
+;;   (multiple-value-bind (valid errors) (validate 'bundle parameters)
+;;     (flet ((assoc-val (val) (cdr (assoc val valid))))
+;;       (if-let (title (assoc-val 'title))
+;; 	(let ((item (make-instance 'bundle)))
+;; 	  (set-valid-fields item valid)
+;; 	  (when errors (setf (hunchentoot:session-value 'errors) errors))
+;; 	  (hunchentoot:redirect (get-url item)))))))
 
 (defmethod maybe-delete-images ((item line-item) parameters)
   (when-let (images-to-delete
@@ -84,7 +103,7 @@
   (multiple-value-bind (valid errors) (validate item parameters)
     (set-valid-fields item valid)
     (when errors (setf (hunchentoot:session-value 'errors) errors))
-    (hunchentoot:redirect (get-edit-edit-url item))))
+    (hunchentoot:redirect (get-edit-url item))))
 
 ;; (defmethod maybe-update :after ((item bundle) parameters)
 ;;   (hunchentoot:log-message* :info "~S" parameters))
@@ -138,8 +157,8 @@
       (setf (featured line-item) t)
       (setf (featured line-item) nil)))) 
 
-(defun set-geographies (line-item)
-  )
+;; (defun set-geographies (line-item)
+;;   )
 
 (defmethod validate ((type (eql 'single-item)) parameters)
   (multiple-value-bind (valid-generic errors-generic)

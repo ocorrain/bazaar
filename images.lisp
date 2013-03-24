@@ -17,20 +17,42 @@
 ;; 	      (lisp-magick:magick-scale-image wand (truncate (* a height)) height)))
 ;; 	(lisp-magick:magick-write-image wand thumbname))))
 
+;; (defun create-thumbnail (source-path dest-path box-x box-y &optional (frame-color (list 0 0 0)))
+;;   (cl-gd:with-image-from-file (img source-path)
+;;     (multiple-value-bind (image-x image-y)
+;; 	(cl-gd:image-size img)
+;;       (multiple-value-bind (new-x new-y)
+;; 	  (get-resize-dimensions image-x image-y box-x box-y)
+;; 	(cl-gd:with-image (new new-x new-y t)
+;; 	  (cl-gd:copy-image img new 0 0 0 0 image-x image-y
+;; 			    :resize t :resample t
+;; 			    :dest-width new-x :dest-height new-y)
+;; 	  (cl-gd:write-image-to-file dest-path
+;; 				     :if-exists :supersede
+;; 				     :image new))
+;; 	(values new-x new-y)))))
+
+
 (defun create-thumbnail (source-path dest-path box-x box-y &optional (frame-color (list 0 0 0)))
   (cl-gd:with-image-from-file (img source-path)
     (multiple-value-bind (image-x image-y)
 	(cl-gd:image-size img)
       (multiple-value-bind (new-x new-y)
 	  (get-resize-dimensions image-x image-y box-x box-y)
-	(cl-gd:with-image (new new-x new-y t)
-	  (cl-gd:copy-image img new 0 0 0 0 image-x image-y
+	(cl-gd:with-image (new box-x box-y t)
+	  (cl-gd:copy-image img new 0 0 
+			    (floor (/ (- box-x new-x) 2))
+			    (floor (/ (- box-y new-y) 2))
+			    image-x image-y
 			    :resize t :resample t
 			    :dest-width new-x :dest-height new-y)
 	  (cl-gd:write-image-to-file dest-path
 				     :if-exists :supersede
 				     :image new))
 	(values new-x new-y)))))
+
+
+
 
 (defun get-resize-dimensions (image-x image-y box-x box-y)
   (if (and (< image-x box-y)
@@ -90,33 +112,31 @@
   (concatenate 'string "/images/"
 	       (namestring (get-small-size-path path))))
 
-(defun resize-all-images (&optional (frame-color '(255 255 255)))
-  (ele:map-btree (lambda (key item)
-		   (declare (ignore key))
-		   (when-let (images (images item))
-		     (dolist (i images)
-		       (let* ((dest-path (make-pathname
-					 :name (pathname-name i) :type (pathname-type i)
-					 :defaults (image-path *web-store*)))
-			      (thumb-path (get-thumb-path dest-path))
-			      (full-size-path (get-full-size-path dest-path))
-			      (small-size-path (get-small-size-path dest-path)))
-	;		 (format t "Making ~A~%" thumb-path)
-			 (create-thumbnail dest-path thumb-path
-					   (get-config-option :thumbnail-width)
-					   (get-config-option :thumbnail-height)
-					   frame-color)
-	;		 (format t "Making ~A~%" full-size-path)
-			 (create-thumbnail dest-path full-size-path
-					   (get-config-option :display-width)
-					   (get-config-option :display-height)
-					   frame-color)
-	;		 (format t "Making ~A~%" small-size-path)
-			 (create-thumbnail dest-path small-size-path
-					   (get-config-option :small-width)
-					   (get-config-option :small-height)
-					   frame-color)))))
-		 (items *web-store*)))
+(defun resize-all-images (class &optional (frame-color '(255 255 255)))
+  (dolist (item (get-all-objects class))
+    (when-let (images (images item))
+      (dolist (i images)
+	(let* ((dest-path (make-pathname
+			   :name (pathname-name i) :type (pathname-type i)
+			   :defaults (image-path *web-store*)))
+	       (thumb-path (get-thumb-path dest-path))
+	       (full-size-path (get-full-size-path dest-path))
+	       (small-size-path (get-small-size-path dest-path)))
+					;		 (format t "Making ~A~%" thumb-path)
+	  (create-thumbnail dest-path thumb-path
+			    (get-config-option :thumbnail-width)
+			    (get-config-option :thumbnail-height)
+			    frame-color)
+					;		 (format t "Making ~A~%" full-size-path)
+	  (create-thumbnail dest-path full-size-path
+			    (get-config-option :display-width)
+			    (get-config-option :display-height)
+			    frame-color)
+					;		 (format t "Making ~A~%" small-size-path)
+	  (create-thumbnail dest-path small-size-path
+			    (get-config-option :small-width)
+			    (get-config-option :small-height)
+			    frame-color))))))
 
 (defun image-thumbnails (list render-func)
   (with-html-output-to-string (s)
@@ -131,11 +151,11 @@
 		(with-html-output-to-string (s)
 		  (:img :src (get-thumb-url image))))))
 
-(defmethod display-an-image ((item line-item) &optional (image-func #'get-thumb-url))
+(defmethod display-an-image ((item images-mixin) &optional (image-func #'get-thumb-url))
   (with-html-output-to-string (s)
     (:img :src (funcall image-func (random-elt (images item))))))
 
-(defmethod display-a-small-image ((item line-item))
+(defmethod display-a-small-image ((item images-mixin))
   (with-html-output-to-string (s)
     (:img :src (get-small-url (random-elt (images item))))))
 
@@ -195,3 +215,18 @@
 			(get-config-option :small-width)
 			(get-config-option :small-height))
       (push (make-pathname :name stub :type type) (images line-item)))))
+
+
+;; Objects that have a gallery of images associates with them
+(defmethod edit-object/post ((obj images-mixin) (page (eql :images)))
+  (when-let (picture (hunchentoot:post-parameter "picture"))
+    (maybe-add-image picture obj))
+  (image-edit-page obj))
+
+(defmethod edit-object ((obj images-mixin) (page (eql :images)))
+  (when-let (image-to-delete (hunchentoot:get-parameter "delete"))
+    (setf (images obj) (remove-if (lambda (i)
+				    (string-equal image-to-delete
+						  (get-image-number-as-string i)))
+				  (images obj))))
+  (image-edit-page obj))

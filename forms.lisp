@@ -18,8 +18,9 @@
 
 (defun item-form (&optional line-item)
   (with-html-output-to-string (s nil :indent t)
-    ((:form :action (if line-item (format nil (get-edit-edit-url line-item) (sku line-item))
-			"/new/item")
+    ((:form :action (if line-item
+			(get-edit-url line-item)
+			(get-new-url :line-item))
 	    :method :post)
      (textfield "title" s "Name" "Name or title of this item" (when line-item (title line-item)))
      (textfield "short-description" s "Short description" "A one-line description of the item"
@@ -67,7 +68,7 @@
 
 (defun tag-form (&optional tag)
   (with-html-output-to-string (s nil :indent t)
-    ((:form :action (if tag (get-edit-edit-url tag)
+    ((:form :action (if tag (get-edit-url tag)
 			"/new/tag")
 	    :method :post)
      (textfield "name" s "Name" "The name of this tag" (when tag (tag-name tag)))
@@ -75,6 +76,8 @@
 	       (when tag (appears-in-menu tag)))
      (checkbox "featured" s "Featured?"
 	       (when tag (featured tag)))
+     (checkbox "published" s "Published?"
+	       (when tag (published tag)))
      (textarea "description" s "Description"
 	       "An (optional) description of the tag.  If present,
 this will be used as a blurb when viewing this tag"
@@ -113,12 +116,22 @@ this will be used as a blurb when viewing this tag"
 
 (defun image-form (line-item)
   (with-html-output-to-string (s nil)
-    ((:form :action (get-edit-image-url line-item) :method :post :enctype "multipart/form-data")
+    ((:form :action (get-edit-page-url line-item :images) :method :post :enctype "multipart/form-data")
      ((:label :for "picture") "Upload an image")
      (:input :type "file" :name "picture" :class "text")
      (:input :type "submit" :value "Upload" :class "text"))))
 
 
+(defun artwork-form (&optional artwork)
+  (with-html-output-to-string (s nil :indent t)
+    ((:form :action (if artwork
+			(get-edit-url artwork)
+			(get-new-url :artwork))
+	    :method :post)
+     (textfield "title" s "Name" "Name or title" (when artwork (title artwork)))
+     (textfield "description" s "Description" "A one-line description of the item"
+		(when artwork (description artwork)))
+     (submit-button "Submit" s))))
 ;; (defun generic-line-item-fields (stream &optional line-item)
 ;;   (with-html-output (s stream :indent t)
 ;;     ))

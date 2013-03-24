@@ -11,6 +11,7 @@
 	   #:get-tag
 	   #:tag-members
 	   #:tag
+	   #:line-item
 	   #:fix-alist
 	   #:tags
 	   #:item
@@ -58,7 +59,19 @@
 	   #:get-content-from-webform
 	   #:static-content-edit-page
 	   #:static-content-new-page
-	   #:edit-static-content-page))
+	   #:edit-static-content-page
+
+	   
+	   #:delete-object
+	   #:edit-object
+	   #:edit-object/post
+	   #:find-cms-class
+	   #:new-object
+	   #:edit-multiple-objects
+	   #:get-all-objects
+	   #:get-object
+	   #:find-object-and-page
+	   #:view-object-page))
 
 
 (in-package #:shopper)
@@ -73,18 +86,28 @@
 (defclass shopper-acceptor (restas:restas-acceptor)
   ())
 
-(defclass shopper-ssl-acceptor (restas:restas-acceptor)
+(defclass shopper-ssl-acceptor (shopper-acceptor)
   ())
 
-(defun start-shopper (&optional store-path)
-  (unless *web-store*
+(defmethod initialize-instance :after ((acceptor shopper-acceptor) &rest env)
+  (declare (ignore env))
+  (setf (hunchentoot:acceptor-message-log-destination acceptor)
+	(merge-pathnames #p"log/message.log" (base-path *web-store*))
+	(hunchentoot:acceptor-access-log-destination acceptor)
+	(merge-pathnames #p"log/access.log" (base-path *web-store*))))
+
+
+(defun start-shopper (&key store-path (port 9292))
+  (when store-path
     (open-web-store store-path))
+  (unless *web-store*
+    (error "No web store available.  Please specify STORE-PATH or set *WEB-STORE*"))
   (mount-webstore-content)
-  (restas:start '#:shopper :port 9292
+  (restas:start '#:shopper :port port
 		:acceptor-class 'shopper-acceptor)
-  (restas:start '#:shopper-edit :port 9292
+  (restas:start '#:shopper-edit :port port
 		:acceptor-class 'shopper-ssl-acceptor)
-  (restas:start '#:shopper-login :port 9292
+  (restas:start '#:shopper-login :port port
 		:acceptor-class 'shopper-ssl-acceptor))
 
 (defun log-describe (object)
@@ -212,9 +235,3 @@
   url)
 
 
-
-
-
-
-
-	
