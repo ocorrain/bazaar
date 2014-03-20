@@ -2,32 +2,34 @@
 ;;; Copyright (c) 2012, Tiarnán Ó Corráin  All rights reserved.
 
 (asdf:defsystem :shopper
-  :version "0.1"
+  :version "1.0"
   :serial t
-  :depends-on (:restas
-	       :restas-directory-publisher 
-	       :hunchentoot
+  :depends-on (:hunchentoot
 	       :elephant
 	       :cl-who
 	       :alexandria
 	       :local-time
 	       :url-rewrite
-	    ;  :lisp-magick
+	       :split-sequence
+	       :closer-mop
+	       :cl-json
 	       :trivial-shell
 	       :cl-gd
 	       :cl-fad
 	       :drakma
 	       :md5
 	       :puri
-	       :cl-html-parse)
-  :components ((:file "shopper")
+	       :cl-html-parse
+	       :trivial-shell
+	       :uuid
+	       :cl-stripe)
+  :components ((:file "package")
+	       (:file "specials")
+	       (:file "base_classes")
+	       (:file "shopper")
 	       (:file "utilities")
-	       (:file "display-routes")
-	       (:file "edit-routes")
-;	       (:file "tag-routes")
-	       (:file "cart-routes")
+	       (:file "branding")
 	       (:file "user")
-	       (:file "user-routes")
 	       (:file "js")
 	       (:file "widgets")
 	       (:file "item")
@@ -40,6 +42,8 @@
 	       (:file "store")
                (:file "forms")
 	       (:file "tags")
+	       (:file "geo")
+	       (:file "json")
 	       (:file "validation")
 	       (:file "cart")
 	       (:file "customer")
@@ -47,7 +51,5 @@
 	       (:file "display")
 	       (:file "navigation")
 	       (:file "pages")
-	       (:file "order")
-	       (:file "geo")
-	       (:file "paypal")))
+	       (:file "order")))
 

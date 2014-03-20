@@ -13,15 +13,21 @@
 ;;   (let ((initial-price (call-next-method)))
 ;;     (round (* initial-price (/ (- 100 (discount bundle)) 100)))))
 
-(defmethod set-bundle-quantity ((item line-item) (bundle line-item) quantity)
-  ;; fixme test that bundle doesn't exist in item
-  (set-item-quantity item (get-children-qlist bundle) quantity))
+(defun maybe-update-bundle (bundle)
+  (dolist (item-q (get-valid-objects-from-post (hunchentoot:post-parameters*)))
+    (destructuring-bind (item . quantity) item-q
+      (when (valid-item-for-bundle item bundle)
+	(relate bundle item :member-of-bundle quantity)))))
+
+(defun valid-item-for-bundle (item bundle)
+  ;; FIXME
+  t)
 
 (defun bundle-edit-page (item)
   (let ((available-items (remove-if (lambda (i)
 				      (or (contains? item i)
 					  (equal item i)))
-				    (all-items))))
+				    (get-all-objects :line-item))))
     (with-html-output-to-string (s)
       (when (empty? (get-children-qlist item))
 	(htm (:p "This item is currently defined as a single

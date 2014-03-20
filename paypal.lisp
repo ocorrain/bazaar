@@ -15,10 +15,10 @@
 
 
 (defun get-return-url ()
-  "https://ceist.net/success")
+  "https://dovinia.com/success")
 
 (defun get-cancel-url ()
-  "https://ceist.net/cancel")
+  "https://dovinia.com/cancel")
 
 (defun paypal-amt (amount-in-cents)
   (multiple-value-bind (euro cent)
@@ -74,7 +74,7 @@
 		 (cons "PAYMENTREQUEST_0_SHIPTOSTREET" (address1 customer))
 		 (cons "PAYMENTREQUEST_0_SHIPTOCOUNTRYCODE" (country customer))
 		 (cons "SHIPTOCOUNTRY" (country customer))
-		 (cons "ADDROVERRIDE" "1"))))
+		 (cons "ADDROVERRIDE" "0"))))
       (when (city customer)
 	(push (cons "PAYMENTREQUEST_0_SHIPTOCITY" (address2 customer)) customer-alist))
       (when (region customer)

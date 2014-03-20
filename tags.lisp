@@ -13,8 +13,6 @@
    (description :initarg :description :initform "" :accessor description)
    (webform :accessor webform :index t :documentation "Web safe form
    of the tag name for transmission" :type string)
-   (members :initarg :members :initform (ele:make-pset) :accessor tag-members
-	    :documentation "Pset of items tagged with this tag")
    (appears-in-menu :initarg :appears-in-menu :initform nil :accessor appears-in-menu)))
 
 (defmethod initialize-instance :after ((instance tag) &rest stuff)
@@ -28,7 +26,7 @@
   (get-tag webform))
 
 (defmethod get-all-objects ((tag (eql :tag)))
-  (all-tags))
+  (ele:get-instances-by-value 'tag 'store (store-name *web-store*)))
 
 (defmethod get-identifier ((tag tag))
   (webform tag))
@@ -37,18 +35,15 @@
   (with-html-output-to-string (s)
     (when (and (description tag) (not (zerop (length (description tag)))))
       (htm ((:div :class "well") (str (description tag)))))
-    (when-let (thumbs (remove-if-not #'published
-				     (ele:pset-list (tag-members tag))))
+    (when-let (thumbs (remove-if-not #'published (get-tagged-objects tag)))
       (str (thumbnails thumbs #'render-thumb)))))
 
 (defmethod edit-object/post ((tag tag) (page (eql :edit)))
   (maybe-update tag (fix-alist (hunchentoot:post-parameters*)))
   (edit-object tag :edit))
 
-(defmethod delete-object ((obj tag))
-  (dolist (item (ele:pset-list (tag-members obj)))
-	(untag-item item obj))
-  (ele:drop-instance obj))
+(defmethod title ((tag tag))
+  (tag-name tag))
 
 (defmethod get-form ((tag (eql :tag)))
   (tag-form))
@@ -60,37 +55,27 @@
 (defmethod get-edit-tabs ((tag tag))
   '(:view :edit))
 
-(defmethod edit-multiple-objects ((tag (eql :tag)) objs)
-  (make-page (labelise tag)
-	     (thumbnails objs (lambda (tag) (render-thumb tag t)))
-	     :sidebar (edit-bar tag)))
 
 (defmethod view-object ((obj tag))
   (tag-display-page obj))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod tag-item ((item tags-mixin) (tag tag))
-  (ele:with-transaction ()
-    (ele:insert-item item (tag-members tag))
-    (ele:insert-item tag (tags item))))
+(defmethod tag-item ((item cms) (tag tag))
+  (relate item tag :tag))
 
 
-(defmethod untag-item ((item tags-mixin) (tag tag))
-  (ele:remove-item item (tag-members tag))
-  (ele:remove-item tag (tags item)))
+(defmethod untag-item ((item cms) (tag tag))
+  (unrelate item tag :tag))
 
 (defun tagged? (item tag)
-  (ele:find-item tag (tags item)))
+  (relation-exists item tag :tag))
 
 (defun empty-tag (tag)
-  (null (ele:pset-list (tag-members tag))))
-
-(defun all-tags ()
-  (ele:get-instances-by-class 'tag))
+  (not (role-exists tag :tag)))
 
 (defun tags-with-members ()
-  (remove-if #'empty-tag (all-tags)))
+  (remove-if #'empty-tag (get-all-objects :tag)))
 
 (defun menu-tags ()
   (remove-if-not (lambda (tag)
@@ -112,10 +97,10 @@
   (with-html-output (s stream)
     ((:div :id "tags")
      ((:form :action "/tags" :method "post")
-      (when (all-tags)
+      (when (get-all-objects :tag)
 	(htm (fmt "Select from the following tags:")
 	     (:br))
-	(dolist (tag (all-tags))
+	(dolist (tag (get-all-objects :tag))
 	  (htm ((:label :for (webform tag)) (esc (tag-name tag)))
 	       (:input :id (webform tag)
 		       :name (format nil "tags{~A}" (webform tag))
@@ -128,31 +113,21 @@
       (:br)
       (:input :type "submit" :value "tag")))))
 
-(defun get-tag-linked-list (item stream)
-  (with-slots (tags) item
-    (list-of-tags (ele:pset-list tags) stream)))
-
-(defun list-of-tags (tags stream)
-  (with-html-output (s stream)
-    (:ul
-     (dolist (tag tags)
-       (htm (:li ((:a :href (get-tag-url tag)) (str (tag-name tag)))))))))
-
 ;; (defun get-tag-url (tag)
 ;;   (url-rewrite:add-get-param-to-url "/display-tag" "name" (webform tag)))
 
 ;; (defmethod get-view-url ((tag tag))
 ;;   (restas:genurl 'r/view-tag :tag (webform tag)))
 
-(defun get-tagged-items (tag)
-  (ele:pset-list (tag-members tag)))
+(defmethod get-tagged-objects ((tag tag))
+  (get-related-to-objects tag :tag))
 
-(defmethod get-tags ((item tags-mixin))
-  (ele:pset-list (tags item)))
+(defmethod get-tags ((item cms))
+  (get-related-objects item :tag))
 
 
-(defmethod get-edit-view-url ((tag tag))
-  (restas:genurl 'shopper-edit:r/edit-tag/view :tag (webform tag)))
+;; (defmethod get-edit-view-url ((tag tag))
+;;   (restas:genurl 'shopper-edit:r/edit-tag/view :tag (webform tag)))
 
 ;; (defmethod get-edit-edit-url ((tag tag))
 ;;   (restas:genurl 'shopper-edit:r/edit-tag/edit :tag (webform tag)))
@@ -181,7 +156,7 @@
 (defun collect-tags-with (func)
   (remove-if-not (lambda (tag)
 		   (funcall func tag))
-		 (all-tags)))
+		 (get-all-objects :tag)))
 
 (defun tag->nav (list-of-tags)
   (mapcar (lambda (tag)
@@ -189,24 +164,37 @@
 		  (tag-name tag)))
 	  list-of-tags))
 
-(defmethod display-an-image ((tag tag) &optional (image-func #'get-thumb-url))
-  (when-let (member-list (ele:pset-list (tag-members tag)))
-    (when-let (images (mappend #'images member-list))
-      (with-html-output-to-string (s)
-	(:img :src (funcall image-func (random-elt images)))))))
+
+;;fixme
+(defmethod display-an-image ((tag tag) &optional (image-func (thumbnail-element 300 300)))
+  (when-let (images (mappend (lambda (m)
+			       (get-related-objects m :image))
+			     (get-tagged-objects tag)))
+    (with-html-output-to-string (s)
+      (:img :src (funcall image-func (random-elt images))))))
 
 
 
 
 ;; objects that have tags associated with them
-(defmethod edit-object ((obj tags-mixin) (page (eql :tags)))
-  (when-let (toggle-tag (hunchentoot:get-parameter "tag"))
-    (when-let (toggle-tag-obj (get-tag toggle-tag))
-      (if (tagged? obj toggle-tag-obj)
-	  (untag-item obj toggle-tag-obj)
-	  (tag-item obj toggle-tag-obj))))
-  (make-tags-page obj))
+;; REFACTOR
+;; (defmethod edit-object ((obj cms) (page (eql :tags)))
+;;   (when-let (toggle-tag (hunchentoot:get-parameter "tag"))
+;;     (when-let (toggle-tag-obj (get-tag toggle-tag))
+;;       (if (tagged? obj toggle-tag-obj)
+;; 	  (untag-item obj toggle-tag-obj)
+;; 	  (tag-item obj toggle-tag-obj))))
+;;   (make-tags-page obj))
 
-(defmethod delete-object :before ((obj tags-mixin))
-  (dolist (tag (ele:pset-list (tags obj)))
-    (untag-item obj tag)))
+(defmethod delete-object :before ((obj cms))
+  (dolist (from (get-relations-from obj))
+    (let ((role (car from))
+	  (objects (mapcar #'car (cdr from))))
+      (dolist (object objects)
+	(unrelate obj object role))))
+  (dolist (to (get-relations-to obj))
+    (let ((role (car to))
+	  (objects (mapcar #'car (cdr to))))
+      (dolist (object objects)
+	(unrelate object obj role)))))
+

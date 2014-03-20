@@ -3,37 +3,46 @@
 
 (in-package #:shopper)
 
-;; (defun create-thumbnail (filename thumbname width height)
-;;   "Create a thumbnail the image in FILENAME with a max size of WIDTH x HEIGHT
-;; pixel (but with the original aspect ratio) and save it in THUMBNAME."
-;;   (if (or (pathnamep filename)
-;; 	  (pathnamep thumbname))
-;;       (create-thumbnail (namestring filename) (namestring thumbname) width height)
-;;       (lisp-magick:with-magick-wand (wand :load filename)
-;; 	(let ((a (/ (lisp-magick:magick-get-image-width wand)
-;; 		    (lisp-magick:magick-get-image-height wand))))
-;; 	  (if (> a (/ width height))
-;; 	      (lisp-magick:magick-scale-image wand width (truncate (/ width a)))
-;; 	      (lisp-magick:magick-scale-image wand (truncate (* a height)) height)))
-;; 	(lisp-magick:magick-write-image wand thumbname))))
+(ele:defpclass image (cms)
+  ((file :initarg :file :initform "" :accessor get-file)
+   (content-type :initarg :content-type :initform "" :accessor get-content-type)))
 
-;; (defun create-thumbnail (source-path dest-path box-x box-y &optional (frame-color (list 0 0 0)))
-;;   (cl-gd:with-image-from-file (img source-path)
-;;     (multiple-value-bind (image-x image-y)
-;; 	(cl-gd:image-size img)
-;;       (multiple-value-bind (new-x new-y)
-;; 	  (get-resize-dimensions image-x image-y box-x box-y)
-;; 	(cl-gd:with-image (new new-x new-y t)
-;; 	  (cl-gd:copy-image img new 0 0 0 0 image-x image-y
-;; 			    :resize t :resample t
-;; 			    :dest-width new-x :dest-height new-y)
-;; 	  (cl-gd:write-image-to-file dest-path
-;; 				     :if-exists :supersede
-;; 				     :image new))
-;; 	(values new-x new-y)))))
+(defmethod get-object ((image (eql :image)) designator)
+  (get-object-by-designator designator))
+
+(defmethod get-all-objects ((image (eql :image)))
+  (ele:get-instances-by-value 'image 'store (store-name *web-store*)))
+
+(defmethod get-identifier ((image image))
+  (get-designator image))
+
+(defmethod make-thumbnail ((image image) box-x box-y &key (force nil))
+  "High level method for making a thumbnail of an image.  Creates the
+thumbnail file and relates it to the base image with
+relationship :thumbnail."
+  (if (or force (not (get-related-objects-by-info image
+						  :thumbnail (list box-x box-y))))
+      (with-slots (file) image
+	(let* ((source-path (merge-pathnames file (image-path *web-store*)))
+	       (designator (make-designator))
+	       (image-type (pathname-type file))
+	       (dest-path (make-pathname :name designator
+					 :type image-type
+					 :defaults (image-path *web-store*)))
+	       (image-obj (make-instance 'image
+					 :file (make-pathname :name designator
+							      :type image-type)
+					 :designator designator)))
+	  (create-thumbnail source-path dest-path box-x box-y)
+	  (relate image image-obj :thumbnail (list box-x box-y))
+	  image-obj))))
 
 
-(defun create-thumbnail (source-path dest-path box-x box-y &optional (frame-color (list 0 0 0)))
+
+(defun create-thumbnail (source-path dest-path box-x box-y
+			 &optional (frame-color (list 0 0 0)))
+  "Low level function to actually resize a source image and create a
+thumbnail image.  Calls cl-gd."
   (cl-gd:with-image-from-file (img source-path)
     (multiple-value-bind (image-x image-y)
 	(cl-gd:image-size img)
@@ -51,9 +60,6 @@
 				     :image new))
 	(values new-x new-y)))))
 
-
-
-
 (defun get-resize-dimensions (image-x image-y box-x box-y)
   (if (and (< image-x box-y)
 	   (< image-y box-y))
@@ -64,79 +70,26 @@
 			 (list box-x (* image-y (/ box-x image-x)))
 			 (list (* image-x (/ box-y image-y)) box-y))))))
 
-
-
-;; (defun create-thumbnail (filename thumbname width height &optional (frame-color (list 0 0 0)))
-;;   "Create a thumbnail the image in FILENAME with a max size of WIDTH x HEIGHT
-;; pixel (but with the original aspect ratio) and save it in THUMBNAME."
-;;   (if (or (pathnamep filename)
-;; 	  (pathnamep thumbname))
-;;       (create-thumbnail (namestring filename) (namestring thumbname) width height)
-;;       (lisp-magick:with-magick-wand (wand :load filename)
-;; 	(lisp-magick:with-pixel-wand (pwand :comp (255 255 255))
-;; 	  (multiple-value-bind (new-width new-height padding-width padding-height)
-;; 	      (get-thumbnail-dimensions (lisp-magick:magick-get-image-width wand)
-;; 					(lisp-magick:magick-get-image-height wand)
-;; 					width height)
-;; 	    (lisp-magick:magick-scale-image wand new-width new-height)
-;; 	    (lisp-magick:magick-frame-image wand pwand 
-;; 	    				    padding-width
-;; 	    				    padding-height
-;; 	    				    0 0))
-	  
-;; 	  (lisp-magick:magick-write-image wand thumbname)))))
-
-
-;; (defun get-thumbnail-dimensions (width height box-width box-height)
-;;   (let ((image-aspect (/ width height))
-;; 	(box-aspect (/ box-width box-height)))
-;; ;    (format t "Image aspect: ~A ; box aspect: ~A" image-aspect box-aspect)
-;;     (let* ((new-width (if (> image-aspect box-aspect)
-;; 			  box-width (truncate (* box-height image-aspect))))
-;; 	   (new-height (if (> image-aspect box-aspect)
-;; 			   (truncate (/ box-width image-aspect)) box-height))
-	   
-;; 	   (padding-width (truncate (/ (- box-width new-width) 2)))
-;; 	   (padding-height (truncate (/ (- box-height new-height) 2))))
-;;       (values new-width new-height padding-width padding-height))))
-
-(defun get-thumb-url (path)
+(defmethod get-thumb-url ((image image))
   (concatenate 'string "/images/"
-	       (namestring (get-thumb-path path))))
+	       (namestring (get-thumb-path (get-file image)))))
 
-(defun get-full-url (path)
+(defmethod get-thumb-url ((image t))
+  (get-thumb-url (get-object-by-designator image)))
+
+(defmethod get-full-url ((image image))
   (concatenate 'string "/images/"
-	       (namestring (get-full-size-path path))))
+	       (namestring (get-full-size-path (get-file image)))))
 
-(defun get-small-url (path)
+(defmethod get-full-url ((image t))
+  (get-full-url (get-object-by-designator image)))
+
+(defmethod get-small-url ((image image))
   (concatenate 'string "/images/"
-	       (namestring (get-small-size-path path))))
+	       (namestring (get-small-size-path (get-file image)))))
 
-(defun resize-all-images (class &optional (frame-color '(255 255 255)))
-  (dolist (item (get-all-objects class))
-    (when-let (images (images item))
-      (dolist (i images)
-	(let* ((dest-path (make-pathname
-			   :name (pathname-name i) :type (pathname-type i)
-			   :defaults (image-path *web-store*)))
-	       (thumb-path (get-thumb-path dest-path))
-	       (full-size-path (get-full-size-path dest-path))
-	       (small-size-path (get-small-size-path dest-path)))
-					;		 (format t "Making ~A~%" thumb-path)
-	  (create-thumbnail dest-path thumb-path
-			    (get-config-option :thumbnail-width)
-			    (get-config-option :thumbnail-height)
-			    frame-color)
-					;		 (format t "Making ~A~%" full-size-path)
-	  (create-thumbnail dest-path full-size-path
-			    (get-config-option :display-width)
-			    (get-config-option :display-height)
-			    frame-color)
-					;		 (format t "Making ~A~%" small-size-path)
-	  (create-thumbnail dest-path small-size-path
-			    (get-config-option :small-width)
-			    (get-config-option :small-height)
-			    frame-color))))))
+(defmethod get-small-url ((image t))
+  (get-small-url (get-object-by-designator image)))
 
 (defun image-thumbnails (list render-func)
   (with-html-output-to-string (s)
@@ -145,35 +98,31 @@
        (htm ((:li :class "span2")
 	     (str (funcall render-func obj))))))))
 
-(defun item-gallery (item)
-  (image-thumbnails (images item)
-	      (lambda (image)
-		(with-html-output-to-string (s)
-		  (:img :src (get-thumb-url image))))))
+(defmethod get-images ((cms cms))
+  "Get images related to cms with relationship :image"
+  (get-related-objects cms :image))
 
-(defmethod display-an-image ((item images-mixin) &optional (image-func #'get-thumb-url))
+(defmethod display-an-image ((item cms) &optional (image-func (thumbnail-element 300 300)))
   (with-html-output-to-string (s)
-    (:img :src (funcall image-func (random-elt (images item))))))
+    (str (funcall image-func (random-elt (get-images item))))))
 
-(defmethod display-a-small-image ((item images-mixin))
+(defmethod display-a-small-image ((item cms))
   (with-html-output-to-string (s)
-    (:img :src (get-small-url (random-elt (images item))))))
+    (:img :src (get-small-url (random-elt (get-images item))))))
 
 
 (defun display-gallery (images id)
-  (let ((thumb-width (get-config-option :thumbnail-width))
-	  (thumb-height (get-config-option :thumbnail-height)))
-      (with-html-output-to-string (s)
-	(lightbox-gallery s id)
-	((:div :id id)
-	 (:ul
-	  (dolist (i images)
-	    (htm (:li ((:a :href (get-full-url i))
-		       (:img :src (get-thumb-url i)))))))))))
+  (with-html-output-to-string (s)
+    (lightbox-gallery s id)
+    ((:div :id id)
+     (:ul
+      (dolist (i images)
+	(htm (:li ((:a :href (get-full-url i))
+		   (:img :src (get-thumb-url i))))))))))
 
 
 (defmethod edit-display-images ((item line-item))
-  (when (images item)
+  (when (get-images item)
     (let ((thumb-width (get-config-option :thumbnail-width))
 	  (thumb-height (get-config-option :thumbnail-height)))
       (with-html-output-to-string (s)
@@ -188,45 +137,54 @@
 	  (:input :type "submit" :value "Delete")))))))
 
 (defmethod display-images ((item line-item))
-  (when (images item)
-    (let ((thumb-width (get-config-option :thumbnail-width))
-	  (thumb-height (get-config-option :thumbnail-height)))
-      (with-html-output-to-string (s)
-	((:div :id "gallery")
-	 (:ul
-	  (dolist (i (images item))
-	    (htm (:li ((:a :href (get-full-url i))
-		       (:img :src (get-thumb-url i))))))))))))
+  (when-let (images (get-images item))
+    (with-html-output-to-string (s)
+      ((:div :id "gallery")
+       (:ul
+	(dolist (i images)
+	  (htm (:li ((:a :href (get-full-url i))
+		     (:img :src (get-thumb-url i)))))))))))
 
 (defun add-image (path original-filename line-item)
-  (let ((type (string-downcase (pathname-type original-filename)))
-	(stub (get-next-image-stub line-item)))
-    (let ((dest-path (make-pathname
-		      :name stub :type type
-		      :defaults (image-path *web-store*))))
-      (cl-fad:copy-file path dest-path)
-      (create-thumbnail dest-path (get-thumb-path dest-path)
-			(get-config-option :thumbnail-width)
-			(get-config-option :thumbnail-height))
-      (create-thumbnail dest-path (get-full-size-path dest-path)
-			(get-config-option :display-width)
-			(get-config-option :display-height))
-      (create-thumbnail dest-path (get-small-size-path dest-path)
-			(get-config-option :small-width)
-			(get-config-option :small-height))
-      (push (make-pathname :name stub :type type) (images line-item)))))
+  (let* ((type (string-downcase (pathname-type original-filename)))
+	 (stub (make-designator))
+	 (image-file (make-pathname :name stub :type type))
+	 (image-obj (make-instance 'image
+				   :file image-file
+				   :designator stub)))
+    (cl-fad:copy-file path (merge-pathnames image-file (image-path *web-store*)))
+    (make-thumbnail image-obj
+		    (get-config-option :thumbnail-width)
+		    (get-config-option :thumbnail-height))
+    (make-thumbnail image-obj
+		    (get-config-option :display-width)
+		    (get-config-option :display-height))
+    (make-thumbnail image-obj
+		    (get-config-option :small-width)
+		    (get-config-option :small-height))
+    (relate line-item image-obj :image)))
 
 
 ;; Objects that have a gallery of images associates with them
-(defmethod edit-object/post ((obj images-mixin) (page (eql :images)))
+(defmethod edit-object/post ((obj cms) (page (eql :images)))
   (when-let (picture (hunchentoot:post-parameter "picture"))
     (maybe-add-image picture obj))
   (image-edit-page obj))
 
-(defmethod edit-object ((obj images-mixin) (page (eql :images)))
-  (when-let (image-to-delete (hunchentoot:get-parameter "delete"))
-    (setf (images obj) (remove-if (lambda (i)
-				    (string-equal image-to-delete
-						  (get-image-number-as-string i)))
-				  (images obj))))
-  (image-edit-page obj))
+;; (defmethod edit-object ((obj cms) (page (eql :images)))
+;;   (when-let (image-to-delete (hunchentoot:get-parameter "delete"))
+;;     (unrelate obj image-to-delete))
+;;   (image-edit-page obj))
+
+(defmethod get-images ((cms cms))
+  (get-related-objects cms :image))
+
+(defmethod delete-object :before ((obj image))
+  (delete-file (merge-pathnames (get-file obj) (image-path *web-store*))))
+
+(defmethod image-element ((obj image))
+  (with-html-output-to-string (s)
+    (:img :src (image-web-path obj))))
+
+(defmethod image-web-path ((obj image))
+  (format nil "/images/~A" (namestring (get-file obj))))

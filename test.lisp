@@ -42,19 +42,31 @@
   (if (zerop (random 2))
       nil t))
 
-(defun test-provision-store (&key pathname number-of-items number-of-tags images-per-item
-			     sample-image-directory)
-  (new-web-store (random-words 4)
-		 (random-letters 3)
-		 (random-letters 3)
-		 (dirconcat pathname
-			    (get-webform (random-words 1))))
-  (provision-items-test number-of-items)
-  (provision-tags-test number-of-tags)
-  (let ((items (ele:get-instances-by-class 'line-item))
-	(tags (all-tags)))
-    (provision-images-test (get-pictures sample-image-directory) items images-per-item)
-    (tag-items-test items tags)))
+;; (defun test-provision-store (&key pathname number-of-items number-of-tags images-per-item
+;; 			     sample-image-directory)
+;;   (let ((*web-store* (new-web-store (random-words 4)
+;; 				    (random-letters 3)
+;; 				    (random-letters 3)
+;; 				    (dirconcat pathname
+;; 					       (get-webform (random-words 1))))))) 
+;;   (provision-items-test number-of-items)
+;;   (provision-tags-test number-of-tags)
+;;   (let ((items (ele:get-instances-by-class 'line-item))
+;; 	(tags (all-tags)))
+;;     (provision-images-test (get-pictures sample-image-directory) items images-per-item)
+;;     (tag-items-test items tags)))
+
+(defun test-provision-store (web-store &key (number-of-items 10) (number-of-tags 10) (images-per-item 1)
+			     (sample-image-directory "/home/ocorrain/babes/"))
+  (let ((*web-store* web-store))
+    (provision-items-test number-of-items)
+    (provision-tags-test number-of-tags)
+    (let ((items (get-all-objects :line-item))
+    	  (tags (get-all-objects :tag)))
+      (provision-images-test (get-pictures sample-image-directory) items images-per-item)
+      (tag-items-test items tags))))
+
+
 
 
 
@@ -101,6 +113,19 @@
 		     :featured featured
 		     :published published))))
 
+(defvar *sites* nil)
+(defvar *babes* nil)
+(defvar *food* nil)
+
+(defun test-init-store ()
+  (setf *sites* (make-instance 'shopper-sites :port 9292
+			       :db-root "/home/ocorrain/a"))
+  (hunchentoot:start *sites*))
+
+
+(defun test-create-stores ()
+  (setf *babes* (new-web-store *sites* "babes.com" "babes.com" "BAB" "ABB"))
+  (setf *food* (new-web-store *sites* "food.com" "food.com" "FOO" "OOF")))
 
 ;; (defun export-items-test (filename)
 ;;   (with-open-file (f filename :direction :output :if-exists :supersede)

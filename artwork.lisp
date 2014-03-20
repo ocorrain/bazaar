@@ -1,6 +1,6 @@
 (in-package #:shopper)
 
-(ele:defpclass artwork (cms images-mixin tags-mixin)
+(ele:defpclass artwork (cms)
   ((title :initarg :title :initform "" :accessor title)
    (description :initarg :description :initform "" :accessor description)
    (webform :initarg :webform :initform nil :accessor webform :index t)))
@@ -16,20 +16,23 @@
   (ele:get-instance-by-value 'artwork 'webform webform))
 
 (defmethod get-all-objects ((artwork (eql :artwork)))
-  (ele:get-instances-by-class 'artwork))
+  (ele:get-instances-by-value 'artwork 'store (store-name *web-store*)))
 
 (defmethod get-identifier ((artwork artwork))
   (webform artwork))
 
 (defmethod render-object ((artwork artwork))
   (with-html-output-to-string (s)
-    ((:div :class "row")
+    ((:div :class "container")
+     ((:div :class "row")
      ((:div :class "span6")
       (:h2 (str (title artwork)))
       ((:p :class "lead") (str (description artwork))))
      ((:div :class "span6")
-      (str (carousel "imageCarousel" (images artwork) #'full-image-element))))
-    (:script "$('.carousel').carousel()")))
+      (str (carousel "imageCarousel" (get-related-objects artwork :image)
+		     (thumbnail-element 500 500)))))
+    (:script "$('.carousel').carousel()"))))
+
 
 (defmethod edit-object/post ((obj artwork) (page (eql :edit)))
   (maybe-update obj (fix-alist (hunchentoot:post-parameters*))) )
@@ -43,10 +46,6 @@
 (defmethod get-edit-tabs ((artwork artwork))
   '(:view :edit :images :tags))
 
-(defmethod edit-multiple-objects ((artwork (eql :artwork)) objs)
-  (make-page (labelise artwork)
-	     (thumbnails objs (lambda (artwork) (render-thumb artwork t)))
-	     :sidebar (edit-bar artwork)))
 
 (defmethod view-object ((obj artwork))
   (render-object obj))
@@ -89,8 +88,8 @@
   (declare (ignore edit))
   (with-html-output-to-string (s)
     ((:a :href (get-view-url obj))
-     (when (images obj)
-       (htm (str (display-an-image obj #'get-full-url)))))
+     (when (get-related-objects obj :image) 
+       (htm (str (display-an-image obj (thumbnail-element 500 500))))))
     (:p :class "lead"
 	((:a :href (get-view-url obj)) (str (title obj))))
     (:p (str (description obj)))
@@ -114,6 +113,7 @@
 	  ((eq obj 'done) 'done)
 	(when (eq (first obj) 'picture)
 	  (let ((specs (cdr obj)))
+	    (print specs)
 	    (let ((webform (get-webform (getf specs :title))))
 	      (if-let (artwork (get-object :artwork webform))
 		(let ((image (getf specs :file)))
@@ -139,16 +139,24 @@
 	(when (emptyp (tag-name tag))
 	  (delete-object tag))))))
 
-(defun import-from-directory (directory exhibition-name)
-  "Imports jpegs from a directory and adds them to the exhibition
-  named by exhibition-name.  If this does not exist, creates a new
-  exhibition called exhibition-name and adds the images to that as
-  separate artworks."
-  (let ((exhibition (or (get-object :exhibition (get-webform exhibition-name))
-			(make-instance 'exhibition :name exhibition-name))))
-    (dolist (f (cl-fad:list-directory directory))
-      (let ((artwork (make-instance 'artwork :title (pathname-name f))))
-	(add-image f f artwork)
-	(tag-item artwork exhibition))
-      (print (pathname-name f)))))
+(defun get-bubble-tags (bubble-directory)
+  (let* ((store-path (make-pathname :name "store" :defaults bubble-directory))
+	 (store-tags (with-open-file (store store-path)
+		       (let ((store-config (cdr (read store))))
+			 (getf store-config :tags)))))
+    store-tags))
+
+
+;; (defun import-from-directory (directory exhibition-name)
+;;   "Imports jpegs from a directory and adds them to the exhibition
+;;   named by exhibition-name.  If this does not exist, creates a new
+;;   exhibition called exhibition-name and adds the images to that as
+;;   separate artworks."
+;;   (let ((exhibition (or (get-object :exhibition (get-webform exhibition-name))
+;; 			(make-instance 'exhibition :name exhibition-name))))
+;;     (dolist (f (cl-fad:list-directory directory))
+;;       (let ((artwork (make-instance 'artwork :title (pathname-name f))))
+;; 	(add-image f f artwork)
+;; 	(tag-item artwork exhibition))
+;;       (print (pathname-name f)))))
   

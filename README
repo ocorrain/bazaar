@@ -29,3 +29,10 @@ Basic edit object api
 
       get-edit-url object
       get-new-url class-symbol
+
+
+TODO:
+
+	1. jquery editor for static-content
+	3. bundles
+	4. postage price included in orders

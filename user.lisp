@@ -1,7 +1,5 @@
 (in-package #:shopper)
 
-(defun @https-require (route)
-  (make-instance 'https-require :target route))
 
 (defun all-users ()
   (ele:get-instances-by-class 'user))
@@ -39,3 +37,58 @@
 
 (defun has-capability (capability user)
   (member capability (capabilities user)))
+
+(defun login-form (&optional errors)
+  (basic-page "Log in"
+	      (who:with-html-output-to-string (s)
+		((:div :class "container")
+		 (:h2 "Sign in")
+		 (when errors
+		   (who:htm ((:p :class "text-error")
+			     "The login details you supplied were incorrect")))
+		 ((:form :class "form-horizontal" :method "post" :action "/login")
+		  ((:div :class "control-group")
+		   ((:label :class "control-label" :for "username")
+		    "Username")
+		   ((:div :class "controls")
+		    (:input :name "username" :type "text"
+			    :id "username" :placeholder "Username")))
+		  ((:div :class "control-group")
+		   ((:label :class "control-label" :for "password")
+		    "Password")
+		   ((:div :class "controls")
+		    (:input :name "password" :type "password"
+			    :id "password" :placeholder "Password")))
+		  ((:div :class "control-group")
+		   ((:div :class "controls")
+		    ((:button :type "submit" :class "btn")
+		     "Sign in"))))))))
+
+
+(defun login-page ()
+  (if (eql (hunchentoot:request-method*) :post)
+      (let ((username (hunchentoot:post-parameter "username"))
+	    (password (hunchentoot:post-parameter "password")))
+	(if-let (userobj (and username password (get-user username password)))
+	  (progn (hunchentoot:start-session)
+		 (setf (hunchentoot:session-value :user) userobj)
+		 (hunchentoot:redirect "/"))
+	  (login-form t)))
+      (login-form)))
+
+(defun logout ()
+  (hunchentoot:delete-session-value :user)
+  (hunchentoot:redirect "/"))
+
+(defun current-user ()
+  (when-let (current-user (hunchentoot:session-value :user))
+    (username current-user)))
+
+(defun secure-page (function capability)
+  (lambda ()
+    (if-let (user (hunchentoot:session-value :user))
+      (if (has-capability capability user)
+	  (funcall function)
+	  (setf (hunchentoot:return-code*) hunchentoot:+http-forbidden+))
+      (hunchentoot:redirect "/login"))))
+

@@ -63,8 +63,18 @@
 	    ))))
       ""))
 
+(defun add-to-cart ()
+  (maybe-add-items-to-cart)
+  (hunchentoot:redirect (hunchentoot:referer)))
 
+(defun shopping-cart ()
+  (store-open-dependent-page #'shopping-cart-page))
 
+(defun enter-details ()
+  (store-open-dependent-page #'enter-details-page))
+
+(defun place-order ()
+  (store-open-dependent-page #'order-edit-details-page))
 
 (defun get-or-initialize-cart ()
   (if-let (cart (hunchentoot:session-value :cart))
@@ -154,17 +164,17 @@
 	(:dt "Total price")
 	(:dd (str (print-price (get-price cart))))
 	(:dt "Weight")
-	(:dd (fmt "~Ag" (get-weight cart)))))))
+	(:dd (fmt "~Ag" (get-weight cart))))
+)))
     
     (if (items cart)
-	(htm ((:form :class "form-horizontal" :action "/shopping-cart" :method :post)
+	
+	(htm ((:a :href "/enter-details" :class "pull-left btn btn-primary")
+		     "Enter details & check out>>")
+	     ((:form :class "form-horizontal" :action "/shopping-cart" :method :post)
 	      ((:div :class "row")
-	       ((:a :href "/" :class "pull-left btn btn-large btn-success")
-		"<< Continue shopping")
-	       ((:a :href "/enter-details" :class "pull-right btn btn-large btn-primary")
-		"Enter details & check out>>")
-	       ((:button :type "submit" :class "btn btn-large pull-right") "Update totals"))
-     
+	       ((:button :type "submit" :class "btn pull-right") "Update totals"))
+	      
 
 	      (:hr)
 
@@ -172,9 +182,9 @@
 		(destructuring-bind (item quantity) i
 		  (htm ((:div :class "row")
 			((:div :class "span2")
-			 (str (display-an-image item #'get-small-url)))
+			 (str (display-an-image item (thumbnail-element 100 100))))
 			((:div :class "span8")
-			 (:h5 ((:a :href (restas:genurl 'r/view-item :sku (sku item)))
+			 (:h5 ((:a :href (get-view-url item))
 			       (str (title item))))
 			 (:p (str (short-description item)))
 			 (:p (:em "Item price: ") (str (print-price (get-price item)))))
@@ -184,11 +194,8 @@
      
 	      (:hr)
 	      ((:div :class "row")
-	       ((:a :href "/" :class "pull-left btn btn-large btn-success")
-		"Continue shopping")
-	       ((:a :href "/enter-details" :class "pull-right btn btn-large btn-primary")
-		"Enter details & check out>>")
-	       ((:button :type "submit" :class "btn btn-large pull-right") "Update totals"))))
+
+	       )))
 	(htm (:strong (str "Your shopping cart is empty"))))))
 
 
@@ -204,3 +211,139 @@
 		 :customer (get-customer)
 		 :order-price (get-price cart)))
 
+(defun process-payment ()
+  (if-let ((stripe-token (hunchentoot:parameter "stripeToken"))
+	   (cart (get-cart)))
+    (if-let ((stripe-reply (ignore-errors (stripe:create-charge :amount (get-price cart)
+								:currency "eur"
+								:card stripe-token
+								:api-key (stripe-api-key *web-store*)))))
+      (if-let ((paid (stripe::sstruct-get stripe-reply :paid))
+	       (id (stripe:sstruct-get stripe-reply :id)))
+	(if (eql paid :true)
+	    (let ((order (cart->order cart)))
+	      (setf (hunchentoot:session-value :cart) nil)
+	      (setf (hunchentoot:session-value :last-order) order)
+	      (setf (correlation-id order) id)
+	      (hunchentoot:redirect "/order/complete")
+	      ;; (standard-page "Stripe output" nil
+	      ;; 		     (list (escape-describe stripe-reply)
+	      ;; 			   (escape-describe order)))
+	      )
+	    (standard-page "Stripe error" nil
+			   (with-html-output-to-string (s)
+			     (:h1 "Payment error")
+			     (:p "Your payment did not go through.")
+			     (:p (:i (str (stripe:sstruct-get stripe-reply :failure-message)))))))
+      
+	(standard-page "Stripe error" nil
+		       (with-html-output-to-string (s)
+			 (:h1 "Payment error")
+			 (:p "Your payment did not go through.")
+			 (:p (:i "No reply from stripe")))))
+      (setf (hunchentoot:return-code*) hunchentoot:+http-service-unavailable+))))
+
+(defun escape-describe (object)
+  (with-html-output-to-string (str)
+    (:pre (str (escape-string-all (with-output-to-string (s)
+				    (describe object s)
+				    (format s "~S" object)))))))
+
+
+(defun stripe-checkout (cart &optional (postage 0) (label "Pay now with stripe"))
+  (let ((customer (get-or-initialize-customer)))
+    (with-html-output-to-string (s nil :indent t)
+      (:form :action "/process-payment" :method :post
+	     (:script
+	      :src "https://checkout.stripe.com/checkout.js" :class "stripe-button"
+	      :data-key "pk_test_aq2axR6BzY9AL03K5U3oc2Lb"
+	      :data-amount (+ (get-price cart) postage)
+	      :data-name (store-name *web-store*)
+	      :data-email (email customer)
+	      :data-description (format nil "~A items (~A)" (reduce #'+ (mapcar #'second (items cart)))
+					(print-price (get-price cart)))
+	      :data-image (image-web-path (get-branding-relation (get-branding *web-store*)
+								 :thumbnail))
+	      :data-currency "EUR"
+	      :data-label label)))))
+
+(defun maybe-update-cart (cart parameters)
+  (dolist (item-q (get-valid-objects-from-post parameters))
+    (destructuring-bind (item . quantity) item-q
+      (set-item-quantity item cart quantity))))
+
+(defun order-edit-details-page ()
+  (multiple-value-bind (customer errors)
+      (maybe-create/update-customer)
+    (multiple-value-bind (valid verrors)
+	(is-valid-customer? customer)
+      (if valid
+	  (basic-finalize-page)
+	  (basic-edit-address-page (append errors (list verrors)))))))
+
+(defun view-rates (cart customer)
+  (with-html-output-to-string (s)
+    (if-let (rates (postage-options cart customer))
+      (htm (:table :class "table"
+		   (:thead (:tr (:th "Shipping method")
+				(:th "Shipping cost")
+				(:th "TOTAL")
+				(:th "")))
+		   (:tbody
+		    (dolist (rate rates)
+		      (destructuring-bind (name . cost) rate
+			(htm (:tr (:td (str name))
+				  (:td (str (print-price cost)))
+				  (:td (str (print-price (+ cost (get-price cart)))))
+				  (:td (str (stripe-checkout cart cost (format nil "Ship with ~A" name)))))))))))
+      (htm ((:div :class "alert alert-error")
+       (:p "We're sorry, but we have no postal providers servicing your country.  We will not be able to complete this order."))))))
+
+(defun checkout-cart (cart)
+  (with-html-output-to-string (s)
+    (:h4 "Order contents")
+    ((:a :href "/shopping-cart" :class "btn btn-small pull-right")
+     "Change shopping cart")
+    (:table :class "table"
+	    (:thead (:tr  (:th "Item") (:th "Unit price") (:th "Quantity") (:th "Subtotal")))
+	    (:tfoot (:tr  (:th "") (:th "") (:th "Total (-pp)") (:th (str (print-price (get-price cart))))))
+	    (dolist (i (items cart))
+	      (destructuring-bind (item quantity) i
+		(htm (:tr (:td (str (title item)))
+			  (:td (str (print-price (get-price item))))
+			  (:td (str quantity))
+			  (:td (str (print-price (* quantity (get-price item))))))))))))
+
+(defun invalid-items (invalid)
+  (when invalid
+    (with-html-output-to-string (s)
+      ((:div :class "alert alert-error")
+       (:p "The following items are not available in your geographical area.  They have been removed from your shopping cart")
+       (:ul
+	(dolist (inv invalid)
+	  (htm (:li (str (title (qlist-entry-item inv)))))))))))
+
+(defun basic-finalize-page ()
+  (let ((cart (get-cart))
+	(customer (get-customer)))
+    (multiple-value-bind (valid invalid)
+	(check-order cart customer)
+      (setf (items cart) valid)
+      (standard-page "Finalize order" nil
+		     (with-html-output-to-string (s)
+		       ((:div :class "container")
+			(:div :class "row"
+			      (:div :class "span3"
+				    (str (customer-details customer)))
+			      (:div :class "span9"
+				    (str (invalid-items invalid))
+				    (str (checkout-cart cart))
+				    (str (view-rates cart customer))))))))))
+
+(defun maybe-add-items-to-cart ()
+  (let* ((sku (hunchentoot:post-parameter "sku"))
+	 (quantity (hunchentoot:post-parameter "number"))
+	 (sku-item (get-item sku))
+	 (valid-quantity (validate-number quantity)))
+    (when (and sku-item valid-quantity)
+      (add-item sku-item (get-or-initialize-cart) valid-quantity))))

@@ -5,21 +5,8 @@
 function just makes sure the right components are included and sets up
 some basic CSS."
   (with-html-output-to-string (s nil :prologue t :indent t)
-    ((:html :lang "en") (:head (:title (str title))
-			       (:link :href "/s/css/bootstrap.min.css" :rel "stylesheet"))
-     
-     (:body
-      ;; ((:div :class "container")
-      ;;  (str (main-navigation navigation)))
-      ((:div :class "container")
-       ((:div :class "row")
-	((:div :class "span8")
-	 (str (gallery-navigation navigation)))
-	((:div :class "span4")
-	 (:p :class "lead" (str title))))
-       (str body))
-      (:script :src "http://code.jquery.com/jquery-latest.js")
-      (:script :src "/s/js/bootstrap.min.js")))))
+    ((:div :class "container")
+       (str body))))
 
 (defmethod display-index-page ((store (eql :gallery)))
   (gallery-grid-page "cathycarman.com"
@@ -29,7 +16,7 @@ some basic CSS."
   (with-html-output-to-string (s)
     ((:div :class "row")
      ((:div :class "span8")
-      (str (carousel "exhibitionCarousel" (get-tagged-items tag)
+      (str (carousel "exhibitionCarousel" (get-tagged-objects tag)
 		     #'render-full)))
      ((:div :class "span4")
       (:h1 (str (tag-name tag)))))
@@ -55,7 +42,7 @@ some basic CSS."
   (ele:get-instance-by-value 'exhibition 'webform webform))
 
 (defmethod get-all-objects ((exhibition (eql :exhibition)))
-  (ele:get-instances-by-class 'exhibition))
+  (ele:get-instances-by-value 'exhibition 'store (store-name *web-store*)))
 
 (defmethod get-form ((exhibition (eql :exhibition)))
   (exhibition-form))
@@ -111,13 +98,9 @@ this will be used as a blurb when viewing this exhibition"
 	(setf (published exhibition) t)
 	(setf (published exhibition) nil))))
 
-(defmethod edit-multiple-objects ((exhibition (eql :exhibition)) objs)
-  (make-page (labelise exhibition)
-	     (thumbnails objs (lambda (exhibition) (render-thumb exhibition t)))
-	     :sidebar (edit-bar exhibition)))
 
 (defmethod view-object ((obj exhibition))
-  (gallery-grid-page "cathycarman.com"
+  (gallery-grid-page (tag-name obj)
 		     (display-exhibition obj)))
 
 (defmethod main-navigation-tabs ((store-type (eql :gallery)))
@@ -126,8 +109,8 @@ this will be used as a blurb when viewing this exhibition"
 	    (static-content-nav)
 	    (tag->nav (remove-if-not #'featured exhibitions))
 	    (nav-dropdown "Exhibitions"
-			  (tag->nav (remove-if-not #'published exhibitions)))
-	    (login-tabs))))
+			  (tag->nav (sort (remove-if-not #'published exhibitions)
+					  #'string< :key #'tag-name) )))))
 
 
 (defun gallery-navigation (&optional navigation)

@@ -3,7 +3,7 @@
 
 (in-package #:shopper)
 
-(ele:defpclass line-item (cms images-mixin tags-mixin)
+(ele:defpclass line-item (cms)
   ((title :initarg :title :initform ""
 	  :accessor title :index t
 	  :documentation "Title or name of the line item" :type string)
@@ -49,7 +49,12 @@
   (get-item sku))
 
 (defmethod get-all-objects ((item (eql :line-item)))
-  (all-items))
+  (let ((items '()))
+    (ele:map-btree (lambda (k v)
+		     (declare (ignore k))
+		     (push v items))
+		   (items *web-store*))
+    items))
 
 (defmethod get-identifier ((item line-item))
   (sku item))
@@ -62,11 +67,11 @@
   (maybe-update obj (fix-alist (hunchentoot:post-parameters*)))
   (item-form obj))
 
-(defmethod edit-object ((obj line-item) (page (eql :contents)))
-  (bundle-edit-page obj))
+;; (defmethod edit-object ((obj line-item) (page (eql :contents)))
+
 
 (defmethod edit-object/post ((obj line-item) (page (eql :contents)))
-  (maybe-update-bundle obj)
+  (maybe-update-bunpdle obj)
   (bundle-edit-page obj))
 
 (defmethod get-form ((item (eql :line-item)))
@@ -78,16 +83,11 @@
 (defmethod get-edit-tabs ((item line-item))
   '(:view :edit :images :tags :contents))
 
-(defmethod edit-multiple-objects ((item (eql :line-item)) objs)
-  (make-page (labelise item)
-	     (thumbnails objs (lambda (item) (render-thumb item t)))
-	     :sidebar (edit-bar item)))
 
 (defmethod view-object ((obj line-item))
   (with-html-output-to-string (s)
     ((:div :class "container")
-     (str (display-item-content obj))
-     (str (display-related-items obj)))))
+     (str (display-item-content obj)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -100,25 +100,23 @@
 (defgeneric get-weight (item))
 
 
-(defmethod get-next-image-stub ((obj images-mixin))
-  (prog1
-      (format nil "~A_~A" (get-identifier obj) (image-counter obj))
-    (incf (image-counter obj))))
+(defmethod get-next-image-stub ((obj cms))
+  (make-designator))
 
-(defmethod get-edit-view-url ((line-item line-item))
-  (restas:genurl 'shopper-edit:r/edit-item/view :sku (sku line-item)))
+;; (defmethod get-edit-view-url ((line-item line-item))
+;;   (restas:genurl 'shopper-edit:r/edit-item/view :sku (sku line-item)))
 
-(defmethod get-edit-edit-url ((line-item line-item))
-  (restas:genurl 'shopper-edit:r/edit-item/edit :sku (sku line-item)))
+;; (defmethod get-edit-edit-url ((line-item line-item))
+;;   (restas:genurl 'shopper-edit:r/edit-item/edit :sku (sku line-item)))
 
-(defmethod get-edit-image-url ((line-item line-item))
-  (restas:genurl 'shopper-edit:r/edit-item/images :sku (sku line-item)))
+;; (defmethod get-edit-image-url ((line-item line-item))
+;;   (restas:genurl 'shopper-edit:r/edit-item/images :sku (sku line-item)))
 
-(defmethod get-edit-tags-url ((line-item line-item))
-  (restas:genurl 'shopper-edit:r/edit-item/tags :sku (sku line-item)))
+;; (defmethod get-edit-tags-url ((line-item line-item))
+;;   (restas:genurl 'shopper-edit:r/edit-item/tags :sku (sku line-item)))
 
-(defmethod get-edit-contents-url ((line-item line-item))
-  (restas:genurl 'shopper-edit:r/edit-item/contents :sku (sku line-item)))
+;; (defmethod get-edit-contents-url ((line-item line-item))
+;;   (restas:genurl 'shopper-edit:r/edit-item/contents :sku (sku line-item)))
 
 (defun collect-items-with (func)
   (let ((result '()))
@@ -154,17 +152,4 @@
 			       :name (funcall item-input-func item)
 			       :value 0)))))
       ((:button :type "submit" :class "btn btn-primary") "Add to bundle")))))
-
-(defun all-items ()
-  (let ((items '()))
-    (ele:map-btree (lambda (k v)
-		     (declare (ignore k))
-		     (push v items))
-		   (items *web-store*))
-    items))
-
-
-
-
-
 

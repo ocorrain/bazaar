@@ -12,3 +12,5 @@
 (defmethod get-images ((item single-item))
   (images item))
 
+(defmethod get-images ((cms cms))
+  )

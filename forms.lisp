@@ -5,13 +5,14 @@
 
 (defun edit-store-form ()
   (with-html-output-to-string (s nil :indent t)
-    ((:form :action (restas:genurl 'shopper-edit:store/edit/parameters)
+    ((:form :action "";(restas:genurl 'shopper-edit:store/edit/parameters)
 	    :method :post)
      (textfield "name" s "Name" "The name of this web-store" (store-name *web-store*))
      (textfield "sku" s "SKU prefix" "Alphabetic prefix for stock-keeping-units"
 		(sku-prefix *web-store*))
      (textfield "order" s "Order prefix" "Alphabetic prefix for orders"
 		(order-prefix *web-store*))
+     (textfield "stripekey" s "Stripe API key" "API key" (stripe-api-key *web-store*))
      (checkbox "open" s "Open?" (store-open *web-store*))
      (:br)
      (submit-button "Submit" s))))
@@ -56,7 +57,7 @@
 		(when line-item (price line-item)))
 
      (:p "Enter the postal regions in which this item is available")
-     (dolist (geo (all-geographies))
+     (dolist (geo (get-all-objects :geography))
        (checkbox (format nil "G_~A" (hunchentoot:url-encode (geo-name geo)))
 		 s
 		 (geo-name geo)
@@ -114,13 +115,22 @@ this will be used as a blurb when viewing this tag"
 ;;      (generic-line-item-fields stream line-item)
 ;;      (submit-button "Next >>" s))))
 
-(defun image-form (line-item)
+;; (defun image-form (line-item)
+;;   (with-html-output-to-string (s nil)
+;;     ((:form :action (get-edit-page-url line-item :images) :method :post :enctype "multipart/form-data")
+;;      ((:label :for "picture") "Upload an image")
+;;      (:input :type "file" :name "picture" :class "text")
+;;      (:input :type "submit" :value "Upload" :class "text"))))
+
+(defun create-image-form (action name)
   (with-html-output-to-string (s nil)
-    ((:form :action (get-edit-page-url line-item :images) :method :post :enctype "multipart/form-data")
-     ((:label :for "picture") "Upload an image")
-     (:input :type "file" :name "picture" :class "text")
+    ((:form :action action :method :post :enctype "multipart/form-data")
+     ((:label :for name) "Upload an image")
+     (:input :type "file" :name name :class "text")
      (:input :type "submit" :value "Upload" :class "text"))))
 
+(defmethod image-form ((item line-item))
+  (create-image-form (get-edit-page-url item :images) "picture"))
 
 (defun artwork-form (&optional artwork)
   (with-html-output-to-string (s nil :indent t)
@@ -150,7 +160,8 @@ this will be used as a blurb when viewing this tag"
 (defun textarea (name stream label text default-value)
   (with-html-output (s stream :indent t)
     ((:label :for name) (str label)) 
-    ((:textarea :name name :class "text") (if default-value (str default-value) (str "")))
+    ((:textarea :name name :class "rte-zone")
+     (if default-value (str default-value) (str "")))
     ((:span :class "help-block") (str text))
     ))
 

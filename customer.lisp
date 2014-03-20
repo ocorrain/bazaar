@@ -177,3 +177,21 @@
 	      
 	      (:strong (str (get-country-name-from-iso-code
 			     (country customer)))))))
+
+(defun customer-details (customer)
+  (with-html-output-to-string (s)
+    (:h4 "Customer details")
+    (:dl (:dt "Customer email")
+	 (:dd (:address (str (email customer))))
+	 (:dt "Shipping address")
+	 (:dd (str (display-customer-address customer))))
+    
+    ((:a :href "/enter-details" :class "btn btn-small pull-left")
+     "Change address")))
+
+(defun basic-edit-address-page (&optional errors)
+  (basic-page "Re-enter address details"
+	      (with-html-output-to-string (s)
+		((:div :class "container")
+		 (str (customer-address-form errors))))))
+

@@ -3,28 +3,36 @@
 
 (in-package #:shopper)
 
-(defun edit-store-page (&optional parameters)
-  (when parameters
-    (flet ((get-p (parameter)
-	     (when-let (value (cdr (assoc parameter parameters :test #'string-equal)))
-	       (when (and (stringp value) (not (zerop (length value))))
-		 value))))
-      (when-let (name (get-p "name"))
-	(setf (store-name *web-store*) name))
-      (when-let (skup (get-p "sku"))
-	(setf (sku-prefix *web-store*) skup))
-      (when-let (orderp (get-p "order"))
-	(setf (order-prefix *web-store*) orderp))
-      (if (get-p "open")
-	  (setf (store-open *web-store*) t)
-	  (setf (store-open *web-store*) nil))))
-  (basic-page "Edit store parameters"
-	      (with-html-output-to-string (s)
-		((:div :class "container")
-		 ;; (:pre (describe *web-store* s))
-		 ;; (:pre (fmt "~S" parameters))
-		 (:h1 "Edit global parameters")
-		 (str (edit-store-form))))))
+(defun edit-store-page ()
+  (let ((branding (get-branding *web-store*)))
+    (when-let (parameters (hunchentoot:post-parameters*))
+      (update-branding branding)
+      (flet ((get-p (parameter)
+	       (when-let (value (cdr (assoc parameter parameters :test #'string-equal)))
+		 (when (and (stringp value) (not (zerop (length value))))
+		   value))))
+	(when-let (name (get-p "name"))
+	  (setf (store-name *web-store*) name))
+	(when-let (skup (get-p "sku"))
+	  (setf (sku-prefix *web-store*) skup))
+	(when-let (orderp (get-p "order"))
+	  (setf (order-prefix *web-store*) orderp))
+	(if (get-p "open")
+	    (setf (store-open *web-store*) t)
+	    (setf (store-open *web-store*) nil))
+	(when-let (stripekey (get-p "stripekey"))
+	  (setf (stripe-api-key *web-store*) stripekey))))
+
+    (standard-page "Edit store parameters" nil
+		   (list (with-html-output-to-string (s)
+			   (:div :class "container"
+				 (:div :class "row"
+				       (:div :class "span6"
+					     (str (edit-store-form)))
+				       (:div :class "span6"
+					     (str (edit-branding branding))))))
+			 (minimal-edit-bar)))))
+
 
 (defun store-open-dependent-page (page-func)
   (if (store-open *web-store*)
@@ -37,17 +45,19 @@
 
 
 (defun shopping-cart-page ()
-  (basic-page "View shopping cart"
-	      (with-html-output-to-string (s)
-		  ((:div :class "container")
-		 (str (shopping-cart-form (get-or-initialize-cart)))))))
+  (let ((cart (get-or-initialize-cart)))
+    (when-let (parameters (hunchentoot:post-parameters*))
+      (maybe-update-cart cart parameters))
+    (standard-page "View shopping cart" nil
+		   (shopping-cart-form (get-or-initialize-cart)))))
+
 
 (defun enter-details-page ()
-  (basic-page "Enter customer details"
-	      (with-html-output-to-string (s)
-		((:div :class "container")
-		 (:h2 "Enter shipping details")
-		 (str (customer-address-form))))))
+  (standard-page "Enter customer details" nil
+		 (with-html-output-to-string (s)
+		   ((:div :class "container")
+		    (:h2 "Enter shipping details")
+		    (str (customer-address-form))))))
 
 (defun paypal-errors (sent received)
   (with-html-output-to-string (s)
@@ -70,42 +80,35 @@
   (basic-page "Paypal error"
 	      (paypal-errors sent received)))
 
-(defmethod display-index-page ((type (eql :web-store)))
-  (basic-page (format nil "Welcome to ~A" (store-name *web-store*))
-	      (with-html-output-to-string (s)
-		;; ((:div :class "well")
-					;(:h2 "Featured categories")
+
+(defmethod index-page ()
+  (standard-page (format nil "Welcome to ~A" (store-name *web-store*))
+		 nil
+		 (with-html-output-to-string (s)
 		((:div :class "container")
 		 ((:div :class "row")
 		  ((:div :class "span6")
-		   (:h1 (str (store-name *web-store*)))
-		   (:p "Chocolate. There are few foods that people feel as
-	       	passionate about&mdash;a passion that goes beyond a love
-	       	for the 'sweetness' of most candies or desserts: after
-	       	all, few people crave caramel, whipped cream, or
-	       	bubble gum. Chocolate is, well, different. For the
-	       	true chocoholic, just thinking about chocolate can
-	       	evoke a pleasurable response. You may want to grab a
-	       	bar or make a nice cup of hot cocoa before you begin
-	       	exploring here.")
-		   ;; (:p ((:a :class "btn btn-success btn-large pull-right"
-		   ;; 	    :href "/featured")
-		   ;; 	"See our featured items!"))
-		   )
+
+		   (when-let (index (get-object :static-content "index"))
+		     (str (content index))))
+		  
 		  ((:div :class "span6")
 		   (str (carousel "featuredCarousel"
 				  (get-featured-items 10)
 				  (lambda (item)
 				    (with-html-output-to-string (s)
-				      (str (display-an-image item #'get-full-url))
+				      (str (display-an-image item (thumb 500 500)))
 				      (:div :class "carousel-caption"
 					    (:h4 ((:a :class "muted"
 						      :href (get-view-url item))
 						  (str (title item))) )
-					    (:p (str (short-description item)))))))))))
+					    (:p (str (short-description item))))))))))
+		 (when (current-user)
+		   (str (top-edit-bar (get-object :static-content "index")))))
+		
 	     
-		(:script "$('.carousel').carousel()"))
-	      "Home"))
+		(:script "$('.carousel').carousel()"))))
+
 
 ;; (defun store-index-page ()
 ;;   )
@@ -113,103 +116,73 @@
 (defun get-featured-items (&optional number)
   "If NUMBER is specified, return a list of featured items at most
   NUMBER long, otherwise return all featured items."
-  (let ((featured (remove-if-not #'featured (all-items))))
+  (let ((featured (remove-if-not #'featured (get-all-objects :line-item))))
     (cond (number (if (> (length featured) number)
 		      (subseq (shuffle featured) 0 number)
 		      featured))
 	  (t featured))))
 
-(defun featured-items-page ()
-  (make-page (format nil "Featured items")
-	     (with-html-output-to-string (s)
-	       (:h2 "Featured items")
-	       (str (thumbnails (remove-if-not #'featured (all-items))
-				#'render-thumb)))
-	     :sidebar (main-site-bar "")))
 
-(defun make-tags-page (item)
-  (concatenate 'string
-	       (with-html-output-to-string (s)
-		 (:h5 "Current tags")
-		 (:p (str (render-tags (ele:pset-list (tags item)))))
-		 (:h5 "Available tags")
-		 (:p (str (render-tags (remove-if (lambda (tag)
-						    (tagged? item tag))
-						  (all-tags))))))))
+(defun tag-link (tag)
+  (with-html-output-to-string (s)
+    ((:a :href (url-rewrite:add-get-param-to-url
+		(hunchentoot:script-name*) "tag" (webform tag)))
+     (str (tag-name tag)))))
+
+
+(defmethod tag-cloud ((cms cms))
+  (with-html-output-to-string (s)
+    (:ul :class "unstyled"
+     (dolist (tag (get-all-objects :tag))
+       (if (tagged? cms tag)
+	   (htm (:li (:strong (str (tag-link tag)))
+		     (:a :href (get-view-url tag) (:i :class "icon-eye-open"))))
+	   (htm (:li (str (tag-link tag))
+		     (:a :href (get-view-url tag) (:i :class "icon-eye-open")))))))))
+
+
+
+(defun tags-widget (item)
+  (with-html-output-to-string (s)
+    (:h5 "Current tags")
+    (:p (str (render-tags (get-tags item)))
+	(:h5 "Available tags")
+	(:p (str (render-tags (remove-if (lambda (tag)
+					   (tagged? item tag))
+					 (get-all-objects :tag))))))))
  
-;; (defun edit-tag-page (test title)
-;;   (make-page title
-;; 	     (thumbnails (collect-tags-with test)
-;; 			 (lambda (item)
-;; 			   (render-thumb item t)))
-;; 	     :sidebar (edit-bar title)))
 
-(defun tag-edit-page (tag)
-  (make-page (format nil "Editing ~A" (tag-name tag))
-	     (concatenate 'string
-			  (edit-tabs tag "Edit")
-			  (tag-form tag))
-	     :sidebar (edit-bar "New tag")))
 
 (defun tag-display-page (tag)
   (with-html-output-to-string (s)
     ((:div :class "container")
      (when (and (description tag) (not (zerop (length (description tag)))))
-      (htm ((:div :class "well") (str (description tag)))))
-    (when-let (thumbs (remove-if-not #'published
-				     (ele:pset-list (tag-members tag))))
-      (str (thumbnails thumbs #'render-thumb))))))
+       (htm ((:div :class "well") (str (description tag)))))
+     (when-let (thumbs (get-tagged-objects tag))
+       (htm (str (thumbnails thumbs #'render-thumb)))))))
 
 
-
-; existing items
-(defun edit-item-page (test title)
-  (make-page title
-	     (thumbnails (collect-items-with test)
-			 (lambda (item)
-			   (render-thumb item t)))
-	     :sidebar (edit-bar title)))
 
 (defun get-image-number-as-string (image)
   (second (split-sequence:split-sequence #\_
 					 (pathname-name image))))
 
+;; FIXME to add delete functionality
 (defun image-edit-page (item)
   (let ((this-url (get-edit-page-url item :images)))
     (concatenate 'string
 		 (image-form item)
-		 (image-thumbnails (images item)
+		 (image-thumbnails (get-images item)
 				   (lambda (image)
 				     (with-html-output-to-string (s)
-				       (:img :src (get-thumb-url image))
-				       (:br)
+				       (str (funcall (thumbnail-element 500 500) image))
 				       ((:a :class "btn btn-danger"
 					    :href (url-rewrite:add-get-param-to-url
 						   this-url
-						   "delete"
-						   (get-image-number-as-string image)))
+						   "unrelateimage"
+						   (get-designator image)))
 					"Delete")))))))
 
-(defun edit-front-page ()
-  (make-page
-   "Edit"
-   (with-html-output-to-string (s)
-     ((:div :class "hero-unit")
-      (:h1 "Edit and create items")
-      (:p "Here you can add new items, and edit existing items")
-      ((:a :class "btn btn-primary btn-large" :href "/new/item")
-       "Create a new item")
-      ((:a :class "btn btn-primary btn-large pull-right" :href "/edit/items")
-       "Edit an existing item"))
-
-     ((:div :class "hero-unit")
-      (:h1 "Edit and create tags")
-      (:p "Here you can add new items, and edit existing items")
-      ((:a :class "btn btn-primary btn-large" :href "/new/tag")
-       "Create a new tag")
-      ((:a :class "btn btn-primary btn-large pull-right" :href "/edit/tags")
-       "Edit an existing tag")))
-   :sidebar (edit-bar "Edit")))
 
 (defun thumbnails (list render-func &optional (items-across 4))
   (let ((rows (partition-list list items-across)))
@@ -221,18 +194,13 @@
 		  (htm ((:div :class span)
 			(str (funcall render-func item))))))))))))
 
-(defmethod render-very-short ((obj line-item))
-  (with-html-output-to-string (s)
-    ((:a :href (get-view-url obj))
-     (when (images obj)
-       (htm (str (display-an-image obj #'get-small-url))))
-     (:h5 (str (title obj))))))
+
 
 
 (defmethod render-thumb ((obj line-item) &optional edit)
   (with-html-output-to-string (s)
     ((:a :href (get-view-url obj))
-     (when (images obj)
+     (when (get-related-objects obj :image)
        (htm (str (display-an-image obj)))))
 
     (:p :class "lead"
@@ -343,10 +311,6 @@
 	  hunchentoot:+http-not-found+)
 	hunchentoot:+http-bad-request+)))
 
-(defmethod new-object-form (class)
-  (make-page (format nil "create new ~A" (string-downcase class))
-	     (get-form class)
-	     :sidebar (edit-bar (format nil "New ~A" (string-downcase class)))))
 
 ;; (defun edit-item-edit-page (item &optional debug)
 ;;   (make-page (format nil "Editing ~A" (sku item))
@@ -363,25 +327,14 @@
 
 (defgeneric get-form (symbol-or-instance))
 
-(defmethod edit-object :around ((obj cms) page)
-  (make-page (format nil "Editing ~A" (get-identifier obj))
-	     (with-html-output-to-string (s)
-	       (str (render-edit-tabs obj page))
-	       (str (call-next-method)))
-	     :sidebar (edit-bar "All items")))
+;; (defmethod edit-object :around ((obj cms) page)
+;;   (make-page (format nil "Editing ~A" (get-identifier obj))
+;; 	     (with-html-output-to-string (s)
+;; 	       (str (render-edit-tabs obj page))
+;; 	       (str (call-next-method)))))
 
-(defmethod edit-object/post :around ((obj cms) page)
-  (make-page (format nil "Editing ~A" (get-identifier obj))
-	     (with-html-output-to-string (s)
-	       (hunchentoot:log-message* :error "in edit-object/post")
-	       (str (render-edit-tabs obj page))
-	       (str (call-next-method)))
-	     :sidebar (edit-bar "All items")))
 
-(defmethod new-object (class-sym)
-  (make-page (format nil "Creating new ~A" (labelise class-sym))
-	     (get-form class-sym)
-	     :sidebar (edit-bar "All items")))
+
 
 (defmethod get-edit-tabs ((store-type (eql :web-store)))
   (reduce #'append (mapcar (lambda (class)
@@ -393,7 +346,7 @@
 (defmethod get-edit-tabs (store-type)
   (reduce #'append (mapcar (lambda (class)
 			     (list (labelise class)
-				   (cons (get-new-url class) "create new")
+				   ;(cons (get-new-url class) "create new")
 				   (cons (get-multi-edit-url class) "list all")))
 			   (store-active-classes *web-store*))))
 
@@ -432,18 +385,7 @@
     (nav-tabs (reduce #'append (reverse bar)) active
 	      :class "nav nav-list")))
 
-(defmethod edit-tabs ((item line-item) active)
-  (nav-tabs `((,(get-edit-view-url item) . "View")
-	      (,(get-edit-edit-url item) . "Edit")
-	      (,(get-edit-image-url item) . "Images")
-	      (,(get-edit-tags-url item) . "Tags")
-	      (,(get-edit-contents-url item) . "Contents"))
-	    active))
 
-(defmethod edit-tabs ((tag tag) active)
-  (nav-tabs `((,(get-edit-view-url tag) . "View")
-	      (,(get-edit-edit-url tag) . "Edit"))
-	    active))
 
 (defun display-item-page (item)
   (make-page (format nil "Viewing ~A" (title item))
@@ -465,20 +407,38 @@
       ((:p :class "lead") (str (short-description item)))
       (:p (str (long-description item)))
 
-      (when (not (empty? (get-children-qlist item)))
-	(htm (:h5 "Contains")
-	     (:ul (dolist (i (items (get-children-qlist item)))
-		    (destructuring-bind (ii iq) i
-		      (htm (:li (fmt "~A x ~A" iq (title ii))))))))))
+      ;; reimplement: bundles
+      ;; (when (not (empty? (get-children-qlist item)))
+      ;; 	(htm (:h5 "Contains")
+      ;; 	     (:ul (dolist (i (items (get-children-qlist item)))
+      ;; 		    (destructuring-bind (ii iq) i
+      ;; 		      (htm (:li (fmt "~A x ~A" iq (title ii)))))))))
+      )
      ((:div :class "span6")
-      (str (carousel "imageCarousel" (images item) #'full-image-element))))
+      (str (carousel "imageCarousel"
+		     (get-related-objects item :image) 
+		     (thumbnail-element 500 500)))))
     
     (:script "$('.carousel').carousel()")))
 
-(defun full-image-element (image)
-  (with-html-output-to-string (s)
-    ((:p :align "center")
-     (:img :src (get-full-url image)))))
+(defun thumbnail-element (x y)
+  (lambda (image)
+    (with-html-output-to-string (s)
+    (let ((thumbnail (car (get-related-objects-by-info image :thumbnail (list x y)))))
+      (htm ((:p :align "center")
+	    (if thumbnail
+		(htm (:img :src (format nil "/images/~A" (namestring (get-file thumbnail)))))
+		(htm (:img :src (format nil "/images/~A" (namestring (get-file image))) 
+			   :height y :width x)))))))))
+
+(defun thumb (x y)
+  (lambda (image)
+    (with-html-output-to-string (s)
+      (let ((thumbnail (car (get-related-objects-by-info image :thumbnail (list x y)))))
+	(if thumbnail
+	    (htm (:img :src (format nil "/images/~A" (namestring (get-file thumbnail)))))
+	    (htm (:img :src (format nil "/images/~A" (namestring (get-file image))) 
+		       :height y :width x)))))))
 
 (defun carousel (carousel-id elements render-function)
   (when elements

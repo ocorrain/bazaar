@@ -6,6 +6,7 @@
 
 
 (defmethod maybe-create ((type (eql :tag)) parameters)
+  (hunchentoot:log-message* :error "Post parameters: ~S" parameters)
   (flet ((assoc-val (val) (cdr (assoc val parameters))))
     (if-let (name (validate-as-string (assoc-val 'name)))
       (let ((webform (get-webform name)))
@@ -26,9 +27,7 @@
 (defmethod maybe-create ((type (eql :geography)) parameters)
   (flet ((assoc-val (val) (cdr (assoc val parameters))))
     (if-let (name (assoc-val 'title))
-      (if-let (already-existing (ele:get-instance-by-value 'geography
-							   'geography-name
-							   name))
+      (if-let (already-existing (get-object :geography (get-webform name)))
 	(hunchentoot:redirect (get-edit-url already-existing))
 	(let ((new-geo (make-instance 'geography :name name)))
 	  (setf (geo-members new-geo)
@@ -107,6 +106,11 @@
 
 ;; (defmethod maybe-update :after ((item bundle) parameters)
 ;;   (hunchentoot:log-message* :info "~S" parameters))
+(defmethod maybe-update ((geo geography) parameters)
+  (setf (geo-members geo)
+	(remove-if-not (lambda (p)
+			   (get-country-info-from-iso-code p))
+			 (mapcar #'car (hunchentoot:post-parameters*)))))
 
 (defun maybe-add-image (picture line-item)
   (destructuring-bind (path filename content-type) picture

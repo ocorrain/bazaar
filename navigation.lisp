@@ -5,28 +5,27 @@
 
 (defun main-navigation (&optional navigation)
   (with-html-output-to-string (s)
-    ((:div :class "navbar")
-     (:img :src "/images/banner.jpg")
-     ((:div :class "nav-collapse collapse")
-      (str (nav-tabs (main-navigation-tabs *web-store*)
-		     navigation :class "nav nav-tabs")))
-     (str (navigation-cart)))))
+    (:div :class "navbar"
+	  (:img :src "/images/banner.jpg")
+	  (str (nav-tabs (main-navigation-tabs *web-store*)
+			 navigation :class "nav nav-tabs"))
+ 	  (str (navigation-cart)))))
 
 (defmethod main-navigation-tabs ((store-type (eql :web-store)))
   (append (main-nav-tabs)
 					;			     (static-content-nav)
 	  (tag->nav (featured-tags))
-	  (nav-dropdown "More Chocolate!"
-			(tag->nav (menu-tags)))
-	  (login-tabs)))
+	  ;; (nav-dropdown "More Chocolate!"
+	  ;; 		(tag->nav (menu-tags)))
+	  ))
 
 (defmethod main-navigation-tabs (store-type)
   (append (main-nav-tabs)
 					;			     (static-content-nav)
 	  (tag->nav (featured-tags))
-	  (nav-dropdown "More Chocolate!"
-			(tag->nav (menu-tags)))
-	  (login-tabs)))
+	  ;; (nav-dropdown "More Chocolate!"
+	  ;; 		(tag->nav (menu-tags)))
+	  ))
 
 (defun login-tabs ()
   (when (hunchentoot:session-value :user)
@@ -40,11 +39,12 @@
   (if-let ((store-open-p (store-open *web-store*))
 	   (cart (get-cart)))
     (with-html-output-to-string (s)
-      ((:a :href "/enter-details" :class "pull-right btn btn btn-primary")
-       "CHECKOUT")
-      ((:a :href "/shopping-cart" :class "pull-right btn btn-warning")
-       (:i :class "icon-shopping-cart icon-white")
-       (str (count-items-in cart))))
+      ;; ((:a :href "/enter-details" :class "pull-right btn btn btn-primary")
+      ;;  "CHECKOUT")
+      ((:a :href "/shopping-cart" :class "pull-right btn")
+       (:i :class "icon-shopping-cart")
+       (fmt "~A items (~A)  Checkout." (count-items-in cart) (print-price (get-price cart)))
+       (:i :class "icon-chevron-right")))
     ""))
 
 (defun nav-tabs (alist active &key (class "nav nav-tabs"))

@@ -8,13 +8,16 @@
    (geography-members :initarg :members :initform nil :accessor geo-members :index t)
    (providers :initform nil :accessor geo-providers)))
 
+(defmethod title ((geo geography))
+  (geo-name geo))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; High level API
 (defmethod get-object ((geo (eql :geography)) identifier)
   (get-geo identifier))
 
 (defmethod get-all-objects ((geo (eql :geography)))
-  (all-geographies))
+  (ele:get-instances-by-value 'geography 'store (store-name *web-store*)))
 
 (defmethod get-identifier ((geo geography))
   (get-webform (geo-name geo)))
@@ -39,8 +42,48 @@
 			 (mapcar #'car (hunchentoot:post-parameters*))))
   (geo-form geo))
 
-(defmethod edit-object ((geo geography) (page (eql :postage-rates)))
-  (geo-postage-page geo (hunchentoot:get-parameters*)))
+;; (defmethod edit-object ((geo geography) (page (eql :postage-rates)))
+;;   (geo-postage-page geo (hunchentoot:get-parameters*)))
+(defmethod view-object ((obj geography))
+  (with-html-output-to-string (s)
+    (:h1 (fmt "Geography: ~A" (geo-name obj)))
+    (:h3 "Countries")
+    (fmt "~{~A~^, ~}."
+	 (mapcar (compose #'cdr
+			  #'get-country-info-from-iso-code)
+		 (geo-members obj)))
+    (:h3 "Providers")
+    (:table :class "table"
+	    (dolist (p (geo-providers obj))
+	      (htm (:tr (:td (:strong (str (provider-name p)))) (:td "") (:td "")))
+	      (dolist (rate (get-postage-rates p))
+		(htm (:tr (:td "") (:td (fmt "~Ag" (second rate))) (:td (str (print-price (first rate)))))))))))
+
+(defmethod edit-object ((obj geography))
+  (when-let (params (fix-alist (hunchentoot:post-parameters*)))
+    (maybe-update obj params))
+  (maybe-update-providers obj)
+  (let* ((p (hunchentoot:get-parameters*))
+	 (countries-pane (if p "tab-pane" "tab-pane active"))
+	 (providers-pane (if p "tab-pane active" "tab-pane"))
+	 (countries-tab (if p "" "active"))
+	 (providers-tab (if p "active" "")))
+    (with-html-output-to-string (s)
+      (:div :class "tabbable"
+	    (:ul :class "nav nav-tabs"
+		 (:li :class countries-tab
+		      (:a :href "#countries" :data-toggle "tab" "Countries"))
+		 (:li :class providers-tab
+		      (:a :href "#providers" :data-toggle "tab" "Postage providers")))
+	    (:div :class "tab-content"
+		  (:div :class countries-pane :id "countries"
+			(:a :name "countries" (:h2 "Countries"))
+			(str (geo-form obj)))
+		  (:div :class providers-pane :id "providers"
+			(:a :name "providers" (:h2 "Providers"))
+			(str (geo-postage-page obj))))))))
+
+
 
 (defmethod edit-multiple-objects ((geo (eql :geography)) objs)
   (declare (ignore objs))
@@ -70,7 +113,7 @@
 ;;   (url-rewrite:add-get-param-to-url "/geo" "n" (get-webform (geo-name geo))))
 
 (defun get-geo (webform)
-  (find webform (ele:get-instances-by-class 'geography)
+  (find webform (get-all-objects :geography)
 	:key (lambda (i) (get-webform (geo-name i)))
 	:test #'string-equal))
 
@@ -127,7 +170,7 @@ in that geo"
 (defun get-geo-from-country-code (code)
   (find-if (lambda (geo)
 	     (country-in? code geo))
-	   (all-geographies)))
+	   (get-all-objects :geography)))
 
 (defun get-country-name-from-iso-code (iso-code)
   (cdr (get-country-info-from-iso-code iso-code)))
@@ -402,78 +445,83 @@ in that geo"
 
 (defun geo-postage-page (geo &optional parameters)
   (flet ((postage-rows (provider-name rates)
-	     (with-html-output-to-string (s)
-	       (dolist (rate rates)
-		 (htm (:tr (:td (str (provider-entry-weight rate)))
-			   (:td (str
-				 (print-price (provider-entry-price rate))))
-			   (:td ((:a :href (add-get-parameters-to-url
-					    (get-edit-page-url geo :postage-rates)
-					    (acons "delete" (provider-entry-weight rate)
-						   (acons "provider" provider-name nil))) 
-				     :class "btn btn-small btn-danger")
-				 "X")))))))
-	   (get-parameter (p) (cdr (assoc p parameters :test #'string-equal)))
-	   (get-integer (str) (ignore-errors (parse-integer str :junk-allowed t))))
-      (when-let* ((provider-name (get-parameter "provider"))
-		  (provider-object (find provider-name (geo-providers geo)
-					 :key #'provider-name :test #'string-equal)))
-	(when-let* ((provider-delete (get-parameter "delete"))
-		    (delete-number (get-integer provider-delete)))
-	  (setf (items provider-object)
-		(remove delete-number (items provider-object)
-			:key #'provider-entry-weight)))
-	(when-let* ((provider-weight (get-parameter "weight"))
-		    (provider-price (get-parameter "price"))
-		    (weight (get-integer provider-weight))
-		    (price (get-integer provider-price)))
-	  (setf (items provider-object)
-		(cons (list price weight)
-		      (remove weight (items provider-object)
-			      :key #'provider-entry-weight)))
-	  (set-item-quantity price provider-object weight)))
+	   (with-html-output-to-string (s)
+	     (dolist (rate rates)
+	       (htm (:tr (:td (str (provider-entry-weight rate)))
+			 (:td (str
+			       (print-price (provider-entry-price rate))))
+			 (:td ((:a :href (add-get-parameters-to-url
+					  (get-edit-page-url geo :postage-rates)
+					  (acons "delete" (provider-entry-weight rate)
+						 (acons "provider" provider-name nil))) 
+				   :class "btn btn-small btn-danger")
+			       "X"))))))))
+    
 
-      (when-let ((new-provider (get-parameter "newprovider")))
-	(unless (find new-provider (geo-providers geo)
-		      :key #'provider-name :test #'string-equal)
-	  (push (make-instance 'provider :name new-provider) (geo-providers geo))))
+    (with-html-output-to-string (s)
+      ((:form :action (get-edit-url geo)
+	      :method "get"
+	      :class "form-search")
+       (:input :type "text" :name "newprovider")
+       ((:button :type "submit" :class "btn")
+	"New provider"))
+      (dolist (p (geo-providers geo))
+	(htm (:h2 (str (provider-name p)))
+	     ((:form :action (get-edit-page-url geo :postage-rates)
+		     :class "form form-search"
+		     :method "get")
+	      (:input :type "hidden" :name "provider"
+		      :value (provider-name p))
+	      (:input :type "text" :name "weight"
+		      :placeholder "Weight (g)")
+	      (:input :type "text" :name "price"
+		      :placeholder "Price (cents)")
+	      ((:button :type "submit"
+			:class "btn")
+	       "Add rate"))
+	     ((:a :href (add-get-parameters-to-url
+			 (get-edit-page-url geo :postage-rates)
+			 (acons "deleteprovider" (provider-name p) nil))
+		  :class "btn btn-danger pull-right")
+	      "Delete provider")
+	     ((:table :class "table table-striped table-bordered table-condensed")
+	      (:tr (:th "Weight")
+		   (:th "Price")
+		   (:th "Delete"))
+	      (str (postage-rows (provider-name p)
+				 (get-postage-rates p)))))))))
 
-      (when-let ((delete-provider (get-parameter "deleteprovider")))
-	(setf (geo-providers geo) (remove delete-provider (geo-providers geo)
-					  :key #'provider-name :test #'string-equal)))
+(defun maybe-update-providers (geo)
+  (hunchentoot:log-message* :error "maybe-update-providers")
+  (when-let (parameters (hunchentoot:get-parameters*))
+    (flet ((get-parameter (p) (cdr (assoc p parameters :test #'string-equal)))
+	 (get-integer (str) (ignore-errors (parse-integer str :junk-allowed t))))
+    (when-let* ((provider-name (get-parameter "provider"))
+	      (provider-object (find provider-name (geo-providers geo)
+				     :key #'provider-name :test #'string-equal)))
+    (when-let* ((provider-delete (get-parameter "delete"))
+		(delete-number (get-integer provider-delete)))
+      (setf (items provider-object)
+	    (remove delete-number (items provider-object)
+		    :key #'provider-entry-weight)))
+    (when-let* ((provider-weight (get-parameter "weight"))
+		(provider-price (get-parameter "price"))
+		(weight (get-integer provider-weight))
+		(price (get-integer provider-price)))
+      (setf (items provider-object)
+	    (cons (list price weight)
+		  (remove weight (items provider-object)
+			  :key #'provider-entry-weight)))
+      (set-item-quantity price provider-object weight)))
 
-      (with-html-output-to-string (s)
-				((:form :action (get-edit-page-url geo :postage-rates)
-					:method "get"
-					:class "form-search")
-				 (:input :type "text" :name "newprovider")
-				 ((:button :type "submit" :class "btn")
-				  "New provider"))
-				(dolist (p (geo-providers geo))
-				  (htm (:h2 (str (provider-name p)))
-				       ((:form :action (get-edit-page-url geo :postage-rates)
-					       :class "form form-search"
-					       :method "get")
-					(:input :type "hidden" :name "provider"
-						:value (provider-name p))
-					(:input :type "text" :name "weight"
-						:placeholder "Weight (g)")
-					(:input :type "text" :name "price"
-						:placeholder "Price (cents)")
-					((:button :type "submit"
-						  :class "btn")
-					 "Add rate"))
-				       ((:a :href (add-get-parameters-to-url
-						    (get-edit-page-url geo :postage-rates)
-						    (acons "deleteprovider" (provider-name p) nil))
-					    :class "btn btn-danger pull-right")
-					"Delete provider")
-				       ((:table :class "table table-striped table-bordered table-condensed")
-					(:tr (:th "Weight")
-					     (:th "Price")
-					     (:th "Delete"))
-					(str (postage-rows (provider-name p)
-							   (get-postage-rates p)))))))))
+  (when-let ((new-provider (get-parameter "newprovider")))
+    (unless (find new-provider (geo-providers geo)
+		  :key #'provider-name :test #'string-equal)
+      (push (make-instance 'provider :name new-provider) (geo-providers geo))))
+
+  (when-let ((delete-provider (get-parameter "deleteprovider")))
+    (setf (geo-providers geo) (remove delete-provider (geo-providers geo)
+				      :key #'provider-name :test #'string-equal))))))
 
 ;; (defun geo-postage-page (geoid &optional parameters)
 ;;   (when-let (geo (ele:get-instance-by-value 'geography
@@ -562,9 +610,9 @@ in that geo"
 ;; (defun get-geo-edit-url (geo)
 ;;   (restas:genurl 'shopper-edit:geo/edit :geoid (get-identifier geo)))
 
-(defun get-geo-postage-url (geo)
-  (restas:genurl 'shopper-edit:geo/edit/postage
-		 :geoid (hunchentoot:url-encode (geo-name geo))))
+;; (defun get-geo-postage-url (geo)
+;;   (restas:genurl 'shopper-edit:geo/edit/postage
+;; 		 :geoid (hunchentoot:url-encode (geo-name geo))))
 
 ;; (defun get-geo-delete-url (geo)
 ;;   (restas:genurl 'shopper-edit:geo/delete
@@ -607,28 +655,18 @@ in that geo"
   (member code (geo-members geo)
 	  :test #'equal))
 
+;; FIXME
 (defun item-available-in? (item geo)
-  (member geo (geographies item)))
+  t;; (member geo (geographies item))
+  )
 
-(defun edit-geographies-page ()
-  (make-page "All geographies"
-	     (with-html-output-to-string (s)
-	       (:h1 "All geographies")
-	       (dolist (g (all-geographies))
-		 (htm
-		  (:h3 (str (geo-name g)))
-		  (:p (if-let (members (geo-members g))
-			(fmt "~{~A~^, ~}."
-			     (sort (mapcar (compose #'cdr
-						    #'get-country-info-from-iso-code)
-					   members)
-				   #'string<))
-			(str "No member countries")))
-		  (:p ((:a :class "btn btn-small btn-primary pull-left"
-			   :href (get-edit-url g))
-		       "Edit")
-		      ((:a :class "btn btn-small btn-danger pull-right"
-			   :href (get-delete-url g))
-		       "Delete"))
-		  (:hr))))
-	     :sidebar (edit-bar "All geographies")))
+
+
+(defun postage-options (cart customer)
+  (when-let (geo (get-geo-from-country-code (country customer)))
+    (when-let (rates (get-applicable-postage-rates
+		    (get-weight cart)
+		    geo))
+      (sort rates #'< :key #'cdr))))
+
+
