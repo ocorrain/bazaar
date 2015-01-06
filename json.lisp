@@ -24,6 +24,6 @@
   (json:encode-json (namestring o) stream))
 
 (defun json-object-page (obj)
-  (setf (hunchentoot:content-type*) "application/json")
+  (setf (content-type*) "application/json")
   (with-output-to-string (s)
     (json:encode-json obj s)))

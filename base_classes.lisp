@@ -33,48 +33,15 @@
 			 :accessor store-active-classes)
    (dispatch-table :initarg :dispatch-table :initform nil :accessor dispatch-table :transient t)
    (stripe-api-key :initarg :stripe-api-key :initform nil :accessor stripe-api-key)
+   (stripe-public-api-key :initarg :stripe-public-api-key :initform nil :accessor stripe-public-key)
    (branding :initarg :branding :initform nil :accessor branding)))
 
-(ele:defpclass cms ()
-  ((relations-to :initarg :relations :initform nil :accessor get-relations-to
-		 :documentation "The relations for
-	     this object.  
+(ele:defpclass persistent-relational-object (relational-object)
+  ((relations-to :initarg :relations :initform nil :accessor get-relations-to)
+   (relations-from :initarg :relations-from :initform nil :accessor get-relations-from)))
 
-             Starting implementation: an alist of the structure:
-                   ( RELATION-TYPE . ELEMENTS ) 
-
-             RELATION-TYPE is a keyword representing the nature of the
-             relation ELEMENTS is a list consisting in its most simple
-             form of the object designator for the object in the relation.
-
-             Additional elements may be added to the designator, this
-             is matter for individual class.
-
-             Examples:
-
-             1. Simplicity:
-                   ( :detail . ( image1 ) ( image2 ) ( image3 ))
-                      the same as
-                   ( :detail (image1) (image2) (image3)
-
-                might indicate that image1 image2 and image3 are
-                details of the image in the relation.
-
-             2. More complex:
-                   ( :bundle . (item1 10) (item2 5) (item3 1))
-                     the same as
-                   ( :bundle (item1 10) (item2 5) (item3 1))
-
-                could indicate that the items are present in a bundle
-                in the quantities specified.
-
-             The main constraint is that (car relation) gives the
-             nature of the relation (e.g. :detail), and that 
-              (mapcar #'car (cdr relation))
-             gives the items in the relation without their metadata")
-
-   (relations-from :initarg :relations-from :initform nil :accessor get-relations-from)
-   (designator :initarg :designator :initform (make-designator) :accessor get-designator :index t)
+(ele:defpclass cms (persistent-relational-object)
+  ((designator :initarg :designator :initform (make-designator) :accessor get-designator :index t)
    (featured :initarg :featured :initform nil :accessor featured
 	     :type boolean :index t
 	     :documentation "Is this to be published to the front-page

@@ -13,7 +13,7 @@
    (created :initform (get-universal-time) :accessor created)))
 
 (defun get-customer ()
-  (hunchentoot:session-value :customer))
+  (session-value :customer))
 
 (defun cart-in-well ()
   (with-html-output-to-string (s)
@@ -114,16 +114,16 @@
 	"Confirm and place order >>")))))
 
 (defun get-or-initialize-customer ()
-  (if-let (customer (hunchentoot:session-value :customer))
+  (if-let (customer (session-value :customer))
     customer
     (let ((new-customer (make-instance 'customer)))
-      (setf (hunchentoot:session-value :customer) new-customer)
+      (setf (session-value :customer) new-customer)
       customer)))
 
 (defun maybe-create/update-customer ()
   (let ((customer (get-or-initialize-customer))
 	(errors '()))
-    (flet ((pp (string) (hunchentoot:post-parameter string))) 
+    (flet ((pp (string) (post-parameter string))) 
       (when-let (name (validate-as-string (pp "name")))
 	(setf (name customer) name))
       (when-let (email (validate-as-string (pp "email")))
@@ -186,12 +186,16 @@
 	 (:dt "Shipping address")
 	 (:dd (str (display-customer-address customer))))
     
-    ((:a :href "/enter-details" :class "btn btn-small pull-left")
+    ((:a :href (add-get-parameters-to-url "/enter-details" '(("change" . "yes")))
+	 :class "btn btn-small pull-left")
      "Change address")))
 
 (defun basic-edit-address-page (&optional errors)
-  (basic-page "Re-enter address details"
-	      (with-html-output-to-string (s)
-		((:div :class "container")
-		 (str (customer-address-form errors))))))
+  (standard-page "Re-enter address details" nil
+		 (customer-address-form errors)))
 
+
+(defun shipping-details-widget (customer)
+  (with-html-output-to-string (s)
+    (:h2 "Use this address")
+    (str (customer-details customer))))

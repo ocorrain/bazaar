@@ -14,7 +14,7 @@
 ;;     (round (* initial-price (/ (- 100 (discount bundle)) 100)))))
 
 (defun maybe-update-bundle (bundle)
-  (dolist (item-q (get-valid-objects-from-post (hunchentoot:post-parameters*)))
+  (dolist (item-q (get-valid-objects-from-post (post-parameters*)))
     (destructuring-bind (item . quantity) item-q
       (when (valid-item-for-bundle item bundle)
 	(relate bundle item :member-of-bundle quantity)))))
@@ -33,7 +33,7 @@
 	(htm (:p "This item is currently defined as a single
 	item. This means that it has no contents. To make it into a
 	bundle, click 'Add new items'")
-	     (:pre (fmt "~S" (hunchentoot:get-parameters*)))))
+	     (:pre (fmt "~S" (get-parameters*)))))
       (when available-items
 	(htm ((:a :href (url-rewrite:add-get-param-to-url
 			 (get-edit-page-url item :contents)

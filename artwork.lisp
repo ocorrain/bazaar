@@ -34,8 +34,6 @@
     (:script "$('.carousel').carousel()"))))
 
 
-(defmethod edit-object/post ((obj artwork) (page (eql :edit)))
-  (maybe-update obj (fix-alist (hunchentoot:post-parameters*))) )
 
 (defmethod get-form ((item (eql :artwork)))
   (artwork-form))
@@ -64,10 +62,10 @@
     (if-let (title (validate-as-string (assoc-val 'title)))
       (let ((webform (get-webform title)))
 	(if-let (artwork (get-object :artwork webform))
-	  (hunchentoot:redirect (get-edit-url artwork))
+	  (redirect (get-edit-url artwork))
 	  (let ((artwork-obj (make-instance 'artwork :title title)))
 	    (maybe-update artwork-obj parameters)
-	    (hunchentoot:redirect (get-edit-url artwork-obj))))))))
+	    (redirect (get-edit-url artwork-obj))))))))
 
 (defmethod render-thumb ((obj artwork) &optional edit)
   (declare (ignore edit))

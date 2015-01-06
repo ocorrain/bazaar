@@ -28,9 +28,6 @@
 (defmethod get-edit-tabs ((stat static-content))
   '(:view :edit))
 
-(defmethod edit-object/post ((stat static-content) (page (eql :edit)))
-  (maybe-update stat (fix-alist (hunchentoot:post-parameters*)))
-  (static-content-form stat))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

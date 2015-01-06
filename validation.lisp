@@ -6,7 +6,7 @@
 
 
 (defmethod maybe-create ((type (eql :tag)) parameters)
-  (hunchentoot:log-message* :error "Post parameters: ~S" parameters)
+  (logger :debug "MAYBE-CREATE - type - ~A ; post parameters: ~S" type parameters)
   (flet ((assoc-val (val) (cdr (assoc val parameters))))
     (if-let (name (validate-as-string (assoc-val 'name)))
       (let ((webform (get-webform name)))
@@ -25,6 +25,7 @@
       (hunchentoot:redirect (get-new-url :tag)))))
 
 (defmethod maybe-create ((type (eql :geography)) parameters)
+  (logger :debug "MAYBE-CREATE - type - ~A ; post parameters: ~S" type parameters)
   (flet ((assoc-val (val) (cdr (assoc val parameters))))
     (if-let (name (assoc-val 'title))
       (if-let (already-existing (get-object :geography (get-webform name)))
@@ -38,6 +39,7 @@
       (hunchentoot:redirect (get-new-url :geography)))))
 
 (defmethod maybe-update ((tag tag) parameters)
+  (logger :debug "MAYBE-UPDATE - type - ~A ; post parameters: ~S" tag parameters)
   (flet ((assoc-val (val) (cdr (assoc val parameters))))
     (when-let (name (validate-as-string (assoc-val 'name)))
       (setf (tag-name tag) name)
@@ -58,7 +60,7 @@
   "Object creation template.  Once we have satisfied the minimal
   criteria for an object (the existence of a title), we fill in as
   many other slots as possible and redirect to the object page"
-  (hunchentoot:log-message* :error "in maybe-create item")
+  (logger :debug "MAYBE-CREATE - type - ~A ; post parameters: ~S" type parameters)
   (multiple-value-bind (valid errors) (validate 'single-item parameters)
     (flet ((assoc-val (val) (cdr (assoc val valid))))
       (if-let (title (assoc-val 'title))
@@ -98,6 +100,7 @@
 	    (remove i (images item) :key #'namestring :test #'string-equal)))))
 
 (defmethod maybe-update ((item line-item) parameters)
+  (logger :debug "MAYBE-UPDATE - type - ~A ; post parameters: ~S" item parameters)
   (maybe-delete-images item parameters)
   (multiple-value-bind (valid errors) (validate item parameters)
     (set-valid-fields item valid)
@@ -107,6 +110,7 @@
 ;; (defmethod maybe-update :after ((item bundle) parameters)
 ;;   (hunchentoot:log-message* :info "~S" parameters))
 (defmethod maybe-update ((geo geography) parameters)
+  (logger :debug "MAYBE-UPDATE - type - ~A ; post parameters: ~S" geo parameters)
   (setf (geo-members geo)
 	(remove-if-not (lambda (p)
 			   (get-country-info-from-iso-code p))

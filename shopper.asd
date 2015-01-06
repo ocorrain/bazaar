@@ -22,9 +22,11 @@
 	       :cl-html-parse
 	       :trivial-shell
 	       :uuid
-	       :cl-stripe)
+	       :cl-stripe
+	       :relations)
   :components ((:file "package")
 	       (:file "specials")
+	       (:file "grid")
 	       (:file "base_classes")
 	       (:file "shopper")
 	       (:file "utilities")
@@ -53,3 +55,9 @@
 	       (:file "pages")
 	       (:file "order")))
 
+(asdf:defsystem :shopper-test
+  :components ((:module "test"
+			:serial t
+			:components ((:file "package")
+				     (:file "test"))))
+  :depends-on (:shopper :lift))

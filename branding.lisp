@@ -35,7 +35,7 @@
 
 
 (defun simple-add-image (post-parameter branding relation &optional box-x box-y)
-  (when-let (image (hunchentoot:post-parameter post-parameter))
+  (when-let (image (post-parameter post-parameter))
     (destructuring-bind (path filename content-type) image
       (declare (ignore content-type))
       (let* ((type (string-downcase (pathname-type filename)))

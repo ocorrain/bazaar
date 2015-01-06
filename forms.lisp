@@ -12,7 +12,8 @@
 		(sku-prefix *web-store*))
      (textfield "order" s "Order prefix" "Alphabetic prefix for orders"
 		(order-prefix *web-store*))
-     (textfield "stripekey" s "Stripe API key" "API key" (stripe-api-key *web-store*))
+     (textfield "stripepubkey" s "Stripe Public API key" "Public key" (stripe-public-key *web-store*))
+     (textfield "stripekey" s "Stripe Secret API key" "Secret key" (stripe-api-key *web-store*))
      (checkbox "open" s "Open?" (store-open *web-store*))
      (:br)
      (submit-button "Submit" s))))
@@ -56,14 +57,14 @@
 
 		(when line-item (price line-item)))
 
-     (:p "Enter the postal regions in which this item is available")
-     (dolist (geo (get-all-objects :geography))
-       (checkbox (format nil "G_~A" (hunchentoot:url-encode (geo-name geo)))
-		 s
-		 (geo-name geo)
-		 (when line-item
-		   (member geo (geographies line-item))))
-       (htm (:br)))
+     ;; (:p "Enter the postal regions in which this item is available")
+     ;; (dolist (geo (get-all-objects :geography))
+     ;;   (checkbox (format nil "G_~A" (url-encode (geo-name geo)))
+     ;; 		 s
+     ;; 		 (geo-name geo)
+     ;; 		 (when line-item
+     ;; 		   (member geo (geographies line-item))))
+     ;;   (htm (:br)))
      
      (submit-button "Submit" s))))
 

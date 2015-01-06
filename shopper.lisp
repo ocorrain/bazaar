@@ -5,51 +5,66 @@
 
 ;; stores in shopper-sites is an alist of the form ( REGEX . WEB-STORE )
 
+(defun logger (&rest args)
+  (apply #'log-message* args))
 
-(defmethod hunchentoot:start :before ((shopper-sites shopper-sites))
+(defmethod setup-store-controller ((shopper-sites shopper-sites))
   (let ((sc (ele:open-store
 	     (list :bdb (namestring (dirconcat (database-root shopper-sites)
 					       "store"))))))
     (when sc
-      (setf (store-controller shopper-sites) sc)
-      (let ((stores (ele:get-instances-by-class 'web-store )))
-	(dolist (store stores)
-	  (set-dispatch-table store))
-	(setf (get-stores shopper-sites) stores))))
+      (setf (store-controller shopper-sites) sc))))
+
+
+(defmethod setup-dispatch-table ((shopper-sites shopper-sites))
+  (let ((stores (get-stores shopper-sites)))
+    (dolist (store stores)
+	  (set-dispatch-table store))))
+
+(defmethod setup-logging ((shopper-sites shopper-sites))
+  (let ((root (pathname (database-root shopper-sites))))
+    (setf (acceptor-message-log-destination shopper-sites)
+	  (merge-pathnames #p"log/message.log" root)
+	  (acceptor-access-log-destination shopper-sites)
+	  (merge-pathnames #p"log/access.log" root))))
+
+(defmethod start :before ((shopper-sites shopper-sites))
+  (setup-dispatch-table shopper-sites)
+  (setup-logging shopper-sites)
   shopper-sites)
 
 
 
 (defmethod set-dispatch-table ((web-store web-store))
   (setf (dispatch-table web-store)
-	(list (hunchentoot:create-folder-dispatcher-and-handler "/images/" (image-path web-store))
-	      (hunchentoot:create-folder-dispatcher-and-handler "/s/" (get-twitter-bootstrap-path))
-	      (hunchentoot:create-folder-dispatcher-and-handler "/js/" 
+	(list (create-folder-dispatcher-and-handler "/images/" (image-path web-store))
+	      (create-folder-dispatcher-and-handler "/s/" (get-twitter-bootstrap-path))
+	      (create-folder-dispatcher-and-handler "/js/" 
 								#p"/home/ocorrain/lisp/dev/gallery/js/")
-	      (hunchentoot:create-regex-dispatcher "^/view/([\\w-]+)/(\\w+)$" #'view)
-	      (hunchentoot:create-regex-dispatcher "^/edit/.*$"
+	      (create-regex-dispatcher "^/view/([\\w-]+)/(\\w+)$" #'view)
+	      (create-regex-dispatcher "^/edit/.*$"
 						   (secure-page #'edit :edit-objects))
-	      (hunchentoot:create-regex-dispatcher "^/new/([\\w-]+)"
+	      (create-regex-dispatcher "^/new/([\\w-]+)"
 						   (secure-page #'new :edit-objects))
-	      (hunchentoot:create-regex-dispatcher "^/class/([\\w-]+)"
+	      (create-regex-dispatcher "^/class/([\\w-]+)"
 						   (secure-page #'class-page :edit-objects))
-	      (hunchentoot:create-regex-dispatcher "^/login$" #'login-page)
-	      (hunchentoot:create-prefix-dispatcher "/add-to-cart" #'add-to-cart)
-	      (hunchentoot:create-prefix-dispatcher "/enter-details" #'enter-details)
-	      (hunchentoot:create-prefix-dispatcher "/place-order" #'place-order)
-	      (hunchentoot:create-prefix-dispatcher "/admin/orders"
+	      (create-regex-dispatcher "^/login$" #'login-page)
+	      (create-prefix-dispatcher "/add-to-cart" #'add-to-cart)
+	      (create-prefix-dispatcher "/enter-details" #'enter-details)
+	      (create-prefix-dispatcher "/place-order" #'place-order)
+	      (create-prefix-dispatcher "/admin/orders"
 						    (secure-page #'admin-orders :admin-orders))
-	      (hunchentoot:create-prefix-dispatcher "/order/complete" #'view-completed-order)
-	      (hunchentoot:create-regex-dispatcher "^/admin/view/order/([\\w-]+)$" #'admin-view)
-	      (hunchentoot:create-prefix-dispatcher "/admin/edit/store" 
+	      (create-prefix-dispatcher "/order/complete" #'view-completed-order)
+	      (create-regex-dispatcher "^/admin/view/order/([\\w-]+)$" #'admin-view)
+	      (create-prefix-dispatcher "/admin/edit/store" 
 						    (secure-page #'edit-store-page :admin-store))
-	      (hunchentoot:create-prefix-dispatcher "/shopping-cart" #'shopping-cart)
-	      (hunchentoot:create-prefix-dispatcher "/process-payment" #'process-payment)
-	      (hunchentoot:create-regex-dispatcher "^/logout" #'logout)
-	      (hunchentoot:create-regex-dispatcher "^/delete/.*$" #'delete-obj)
+	      (create-prefix-dispatcher "/shopping-cart" #'shopping-cart)
+	      (create-prefix-dispatcher "/process-payment" #'process-payment)
+	      (create-regex-dispatcher "^/logout" #'logout)
+	      (create-regex-dispatcher "^/delete/.*$" #'delete-obj)
 	      (lambda (r) (declare (ignore r)) #'index-page))))
 
-(defmethod hunchentoot:stop :after ((shopper-sites shopper-sites) &key soft)
+(defmethod stop :after ((shopper-sites shopper-sites) &key soft)
   (declare (ignore soft))
   (ele:close-store (store-controller shopper-sites))
   shopper-sites)
@@ -62,8 +77,8 @@
 		    (when handler ; Handler found. FUNCALL it and return result
 		      (return-from tbnl:acceptor-dispatch-request 
 			(if-let (*web-store* store)
-			  (progn (hunchentoot:log-message* :error "~A : webstore is ~S" 
-							   (hunchentoot:host) *web-store*)
+			  (progn (logger :debug "ACCEPTOR-DISPATCH-REQUEST: host - ~A ; webstore - ~S" 
+					 (hunchentoot:host) *web-store*)
 				 (funcall handler))
 			  (error "No web store"))))))
 		(dispatch-table store))))
@@ -79,102 +94,111 @@
   (format nil "/class/~A" (string-downcase (symbol-name class-sym))))
 
 (defun minimal-edit-bar ()
+  (top-edit-bar))
+
+(defun nav-edit-buttons (obj)
   (with-html-output-to-string (s)
-    (:div :class "navbar navbar-fixed-bottom"
-	  (:div :class "navbar-inner"
-		(:a :class "brand" :href "/" (str (store-name *web-store*)))
-		(:ul :class "nav"
-		     
-		     (:li :class "dropdown"
-			  (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#" 
-			      "New >") 
-			  (:ul :class "dropdown-menu" :role "menu"
-			       (dolist (class (store-active-classes *web-store*))
-				 (str (htm (:li :class ""
-						(:a :href (get-new-url class) 
-						    (str (string-capitalize (symbol-name class))))))))))
-		     (:li :class "dropdown"
-			  (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#" 
-			      "Classes >") 
-			  (:ul :class "dropdown-menu" :role "menu"
-			       (dolist (class (store-active-classes *web-store*))
-				 (str (htm (:li :class ""
-						(:a :href (get-class-url class)
-						    (str (string-capitalize (symbol-name class)))))))))))
-		(:ul :class "nav pull-right"
-		     (:li :class "dropdown"
-			  (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#"
-			      (:i :class "user") (str (current-user)))
-			  (:ul :class "dropdown-menu" :role "menu"
-			       (:li :class ""
-				    (:a :href "/logout" "Log out")))))))))
+    (:li :class ""
+	 (:a :href (get-edit-url obj)  "Edit"))
+    (:li :class ""
+	 (:a :href (get-view-url obj)  "View"))
+    (:li :class "divider-vertical")))
 
+(defun nav-new-button ()
+  (with-html-output-to-string (s)
+    (:li :class "dropdown"
+	 (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#" 
+	     "New >") 
+	 (:ul :class "dropdown-menu" :role "menu"
+	      (dolist (class (store-active-classes *web-store*))
+		(str (htm (:li :class ""
+			       (:a :href (get-new-url class) 
+				   (str (string-capitalize (symbol-name class))))))))))))
 
-(defun top-edit-bar (obj)
-  (with-html-output-to-string (s nil :indent t)
-    (:div :class "navbar navbar-fixed-bottom"
-	  (:div :class "navbar-inner"
-		(:a :class "brand" :href "/" (str (store-name *web-store*)))
-		(:ul :class "nav"
-		     (:li :class ""
-			  (:a :href (get-edit-url obj)  "Edit"))
-		     (:li :class ""
-			  (:a :href (get-view-url obj)  "View"))
-		     (:li :class "divider-vertical")
-		     (:li :class "dropdown"
-			  (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#" 
-			      "New >") 
-			  (:ul :class "dropdown-menu" :role "menu"
-			       (dolist (class (store-active-classes *web-store*))
-				 (str (htm (:li :class ""
-						(:a :href (get-new-url class) 
-						    (str (string-capitalize (symbol-name class))))))))))
-		     (:li :class "dropdown"
-			  (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#" 
-			      "Classes >") 
-			  (:ul :class "dropdown-menu" :role "menu"
-			       (dolist (class (store-active-classes *web-store*))
-				 (str (htm (:li :class ""
-						(:a :href (get-class-url class)
-						    (str (string-capitalize (symbol-name class)))))))))))
-		(:ul :class "nav pull-right"
-		     (:li :class "dropdown"
-			  (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#"
-			      (:i :class "icon-user") (str (current-user)))
-			  (:ul :class "dropdown-menu" :role "menu"
-			       (:li :class ""
-				    (:a :href "/logout" "Log out")))))))))
+(defun nav-classes-menu ()
+  (with-html-output-to-string (s)
+    (:li :class "dropdown"
+	 (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#" 
+	     "Classes >") 
+	 (:ul :class "dropdown-menu" :role "menu"
+	      (dolist (class (store-active-classes *web-store*))
+		(str (htm (:li :class ""
+			       (:a :href (get-class-url class)
+				   (str (string-capitalize (symbol-name class))))))))))))
+
+(defun nav-orders-button ()
+  (with-html-output-to-string (s)
+    (:li :class "divider-vertical")
+    (:li :class ""
+	 (:a :href "/admin/orders"  "Orders"))))
+
+(defun nav-store-button ()
+  (with-html-output-to-string (s)
+    (:li :class "divider-vertical")
+    (:li :class ""
+	 (:a :href "/admin/edit/store"  "Store"))))
+
+(defun nav-user-button (user)
+  (with-html-output-to-string (s)
+    (:ul :class "nav pull-right"
+	 (:li :class "dropdown"
+	      (:a :class "dropdown-toggle" :data-toggle "dropdown" :href "#"
+		  (:i :class "icon-user") (str (current-user)))
+	      (:ul :class "dropdown-menu" :role "menu"
+		   (:li :class ""
+			(:a :href "/logout" "Log out")))))))
+
+(defun top-edit-bar (&optional obj)
+  (when-let (user (get-logged-in-user))
+    (with-slots (capabilities) user
+	(with-html-output-to-string (s nil :indent t)
+	  (:div :class "navbar navbar-fixed-bottom"
+		(:div :class "navbar-inner"
+		      (:a :class "brand" :href "/" (str (store-name *web-store*)))
+		      (:ul :class "nav"
+			   (when (and obj (has-capability :edit-objects user))
+			     (str (nav-edit-buttons obj)))
+			   (when (has-capability :edit-objects user)
+			     (str (nav-new-button)))
+			   
+			   (str (nav-classes-menu))
+			   (when (has-capability :admin-orders user)
+			     (str (nav-orders-button)))
+			   (when (has-capability :admin-store user)
+			     (str (nav-store-button))))
+		      (str (nav-user-button user))))))))
+
 
 
 
 ;; REFACTOR
 (defun view ()
-  (hunchentoot:log-message* :error "webstore is ~S" *web-store*)
+  (logger :debug "VIEW - webstore is ~S" *web-store*)
   (cl-ppcre:register-groups-bind (class id)
-      ("^/view/([\\w-]+)/(\\w+)$" (hunchentoot:script-name*))
+      ("^/view/([\\w-]+)/(\\w+)$" (script-name*))
     (if-let (class-sym (find-cms-class class))
       (progn
-	(hunchentoot:log-message* :error "class is ~S" class-sym)
-	(hunchentoot:log-message* :error "~S" (hunchentoot:headers-in*))
+	(logger :debug "VIEW - class is ~S" class-sym)
+	(logger :debug "VIEW - headers are ~S" (headers-in*))
 	(if-let (obj (get-object class-sym id))
 
-	  (if (string-equal (hunchentoot:header-in* :accept) "application/json")
+	  (if (string-equal (header-in* :accept) "application/json")
 	      (json-object-page obj)
 	      (object-page obj))
 	  (progn
-	    (setf (hunchentoot:return-code*) hunchentoot:+http-not-found+)
-	    (hunchentoot:abort-request-handler)))) 
-      (setf (hunchentoot:return-code*) hunchentoot:+http-bad-request+))))
+	    (setf (return-code*) +http-not-found+)
+	    (abort-request-handler)))) 
+      (setf (return-code*) +http-bad-request+))))
 
 (defun admin-view ()
-  (hunchentoot:log-message* :error "webstore is ~S" *web-store*)
+  (logger :debug "ADMIN-VIEW - webstore is ~S" *web-store*)
   (cl-ppcre:register-groups-bind (id)
-      ("^/admin/view/order/(\\w+)$" (hunchentoot:script-name*))
+      ("^/admin/view/order/(\\w+)$" (script-name*))
     (if-let (obj (get-order id))
       (object-page obj)
       (progn
-	(setf (hunchentoot:return-code*) hunchentoot:+http-not-found+)
-	(hunchentoot:abort-request-handler)))))
+	(setf (return-code*) +http-not-found+)
+	(abort-request-handler)))))
 
 
 
@@ -182,15 +206,13 @@
 
 
 (defun log-describe (object)
-  (hunchentoot:log-message* :debug "~A"
-			    (with-output-to-string (s)
-			      (describe object s))))
+  (logger :debug "~A" (with-output-to-string (s) (describe object s))))
 
 (defun new ()
   (cl-ppcre:register-groups-bind (class)
-      ("^/new/([\\w-]+)" (hunchentoot:script-name*))
+      ("^/new/([\\w-]+)" (script-name*))
     (when-let (class-sym (find-cms-class class))
-      (if-let (parameters (hunchentoot:post-parameters*))
+      (if-let (parameters (post-parameters*))
 	(maybe-create class-sym (fix-alist parameters))
 
 	(standard-page (format nil "New ~A" (string-capitalize class)) 
@@ -198,14 +220,14 @@
 
 (defun class-page ()
   (cl-ppcre:register-groups-bind (class)
-      ("^/class/([\\w-]+)" (hunchentoot:script-name*))
+      ("^/class/([\\w-]+)" (script-name*))
     (when-let (class-sym (find-cms-class class))
       (let ((objects (get-all-objects class-sym)))
-	(if (string-equal (hunchentoot:header-in* :accept) "application/json")
+	(if (string-equal (header-in* :accept) "application/json")
 	    (json-object-page objects)
 	    (standard-page (string-capitalize class) 
-			   nil (list (class-table class objects)
-				     (minimal-edit-bar))))))))
+			   nil (class-table class objects)
+			   (minimal-edit-bar)))))))
 
 
 
@@ -245,17 +267,17 @@
 ;; REFACTOR
 (defun edit ()
   (cl-ppcre:register-groups-bind (class id)
-      ("^/edit/([\\w-]+)/(\\w+)$" (hunchentoot:script-name*))
+      ("^/edit/([\\w-]+)/(\\w+)$" (script-name*))
     (if-let (class-sym (find-cms-class class))
       (progn
-	(hunchentoot:log-message* :error "class is ~S" class-sym)
+	(logger :debug "EDIT - class is ~S" class-sym)
 	(if-let (obj (get-object class-sym id))
 	  (edit-object-page obj)
 	  
 	  (progn
-	    (setf (hunchentoot:return-code*) hunchentoot:+http-not-found+)
-	    (hunchentoot:abort-request-handler)))) 
-      (setf (hunchentoot:return-code*) hunchentoot:+http-bad-request+))))
+	    (setf (return-code*) hunchentoot:+http-not-found+)
+	    (abort-request-handler)))) 
+      (setf (return-code*) hunchentoot:+http-bad-request+))))
 
 
 (defun delete-obj ()
@@ -281,5 +303,5 @@
 (defun boot ()
   (defvar *sites* (make-instance 'shopper-sites :port 9292 :db-root "/home/ocorrain/testsites"))
   (defvar *msg-log* (open "/home/ocorrain/sites.log" :direction :output :if-exists :append :if-does-not-exist :create))
-  (setf (hunchentoot:acceptor-message-log-destination *sites*) *msg-log*)
-  (hunchentoot:start *sites*))
+  (setf (acceptor-message-log-destination *sites*) *msg-log*)
+  (start *sites*))

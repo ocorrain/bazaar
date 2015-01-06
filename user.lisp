@@ -38,8 +38,11 @@
 (defun has-capability (capability user)
   (member capability (capabilities user)))
 
+(defun add-capability (capability user)
+  (push capability (capabilities user)))
+
 (defun login-form (&optional errors)
-  (basic-page "Log in"
+  (standard-page "Log in" nil
 	      (who:with-html-output-to-string (s)
 		((:div :class "container")
 		 (:h2 "Sign in")
@@ -83,6 +86,10 @@
 (defun current-user ()
   (when-let (current-user (hunchentoot:session-value :user))
     (username current-user)))
+
+(defun get-logged-in-user ()
+  (when-let (user (hunchentoot:session-value :user))
+    user))
 
 (defun secure-page (function capability)
   (lambda ()

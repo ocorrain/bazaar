@@ -103,12 +103,12 @@ thumbnail image.  Calls cl-gd."
   (get-related-objects cms :image))
 
 (defmethod display-an-image ((item cms) &optional (image-func (thumbnail-element 300 300)))
-  (with-html-output-to-string (s)
-    (str (funcall image-func (random-elt (get-images item))))))
+  (when-let (images (get-images item))
+    (with-html-output-to-string (s)
+      (str (funcall image-func (random-elt images))))))
 
-(defmethod display-a-small-image ((item cms))
-  (with-html-output-to-string (s)
-    (:img :src (get-small-url (random-elt (get-images item))))))
+
+
 
 
 (defun display-gallery (images id)
@@ -120,30 +120,6 @@ thumbnail image.  Calls cl-gd."
 	(htm (:li ((:a :href (get-full-url i))
 		   (:img :src (get-thumb-url i))))))))))
 
-
-(defmethod edit-display-images ((item line-item))
-  (when (get-images item)
-    (let ((thumb-width (get-config-option :thumbnail-width))
-	  (thumb-height (get-config-option :thumbnail-height)))
-      (with-html-output-to-string (s)
-	(lightbox-gallery s "gallery")
-	((:div :id "gallery")
-	 ((:form :action (get-url item) :method :post)
-	  (:ul
-	   (dolist (i (images item))
-	     (htm (:li ((:a :href (get-full-url i))
-			(:img :src (get-thumb-url i)))
-		       (:input :type "checkbox" :name "imgdel" :value i)))))
-	  (:input :type "submit" :value "Delete")))))))
-
-(defmethod display-images ((item line-item))
-  (when-let (images (get-images item))
-    (with-html-output-to-string (s)
-      ((:div :id "gallery")
-       (:ul
-	(dolist (i images)
-	  (htm (:li ((:a :href (get-full-url i))
-		     (:img :src (get-thumb-url i)))))))))))
 
 (defun add-image (path original-filename line-item)
   (let* ((type (string-downcase (pathname-type original-filename)))
@@ -166,10 +142,6 @@ thumbnail image.  Calls cl-gd."
 
 
 ;; Objects that have a gallery of images associates with them
-(defmethod edit-object/post ((obj cms) (page (eql :images)))
-  (when-let (picture (hunchentoot:post-parameter "picture"))
-    (maybe-add-image picture obj))
-  (image-edit-page obj))
 
 ;; (defmethod edit-object ((obj cms) (page (eql :images)))
 ;;   (when-let (image-to-delete (hunchentoot:get-parameter "delete"))

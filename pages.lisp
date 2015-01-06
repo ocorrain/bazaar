@@ -5,7 +5,7 @@
 
 (defun edit-store-page ()
   (let ((branding (get-branding *web-store*)))
-    (when-let (parameters (hunchentoot:post-parameters*))
+    (when-let (parameters (post-parameters*))
       (update-branding branding)
       (flet ((get-p (parameter)
 	       (when-let (value (cdr (assoc parameter parameters :test #'string-equal)))
@@ -21,43 +21,48 @@
 	    (setf (store-open *web-store*) t)
 	    (setf (store-open *web-store*) nil))
 	(when-let (stripekey (get-p "stripekey"))
-	  (setf (stripe-api-key *web-store*) stripekey))))
+	  (setf (stripe-api-key *web-store*) stripekey))
+	(when-let (pubkey (get-p "stripepubkey"))
+	  (setf (stripe-public-key *web-store*) pubkey))))
 
     (standard-page "Edit store parameters" nil
-		   (list (with-html-output-to-string (s)
+		   (with-html-output-to-string (s)
 			   (:div :class "container"
 				 (:div :class "row"
 				       (:div :class "span6"
 					     (str (edit-store-form)))
 				       (:div :class "span6"
 					     (str (edit-branding branding))))))
-			 (minimal-edit-bar)))))
+		   (minimal-edit-bar))))
 
 
 (defun store-open-dependent-page (page-func)
   (if (store-open *web-store*)
       (funcall page-func)
-      (basic-page (format nil "~A is closed" (store-name *web-store*))
-		  (with-html-output-to-string (s)
-		    ((:div :class "container")
-		     ((:div :class "hero-unit")
-		      (:h3 (fmt "~A is closed" (store-name *web-store*)))))))))
+      (standard-page (format nil "~A is closed" (store-name *web-store*)) nil
+		     (with-html-output-to-string (s)
+		       ((:div :class "container")
+			((:div :class "hero-unit")
+			 (:h3 (fmt "~A is closed" (store-name *web-store*)))))))))
 
 
 (defun shopping-cart-page ()
   (let ((cart (get-or-initialize-cart)))
-    (when-let (parameters (hunchentoot:post-parameters*))
+    (when-let (parameters (post-parameters*))
       (maybe-update-cart cart parameters))
     (standard-page "View shopping cart" nil
 		   (shopping-cart-form (get-or-initialize-cart)))))
 
 
 (defun enter-details-page ()
-  (standard-page "Enter customer details" nil
-		 (with-html-output-to-string (s)
-		   ((:div :class "container")
-		    (:h2 "Enter shipping details")
-		    (str (customer-address-form))))))
+  (if (or (parameter "change") (not (get-customer)))
+      (standard-page "Enter customer details" nil
+		     (with-html-output-to-string (s)
+		       (:h2 "Enter shipping details")
+		       (str (customer-address-form))))
+      (place-order)))
+
+
 
 (defun paypal-errors (sent received)
   (with-html-output-to-string (s)
@@ -77,7 +82,7 @@
 	       (:dd (fmt "~A" (cdr item)))))))))))
 
 (defun paypal-error-page (sent received)
-  (basic-page "Paypal error"
+  (standard-page "Paypal error" nil
 	      (paypal-errors sent received)))
 
 
@@ -85,29 +90,29 @@
   (standard-page (format nil "Welcome to ~A" (store-name *web-store*))
 		 nil
 		 (with-html-output-to-string (s)
-		((:div :class "container")
-		 ((:div :class "row")
-		  ((:div :class "span6")
+		   ((:div :class "container")
+		    ((:div :class "row")
+		     ((:div :class "span6")
 
-		   (when-let (index (get-object :static-content "index"))
-		     (str (content index))))
+		      (when-let (index (get-object :static-content "index"))
+			(str (content index))))
 		  
-		  ((:div :class "span6")
-		   (str (carousel "featuredCarousel"
-				  (get-featured-items 10)
-				  (lambda (item)
-				    (with-html-output-to-string (s)
-				      (str (display-an-image item (thumb 500 500)))
-				      (:div :class "carousel-caption"
-					    (:h4 ((:a :class "muted"
-						      :href (get-view-url item))
-						  (str (title item))) )
-					    (:p (str (short-description item))))))))))
-		 (when (current-user)
-		   (str (top-edit-bar (get-object :static-content "index")))))
+		     ((:div :class "span6")
+		      (str (carousel "featuredCarousel"
+				     (get-featured-items 10)
+				     (lambda (item)
+				       (with-html-output-to-string (s)
+					 (str (display-an-image item (thumb 500 500)))
+					 (:div :class "carousel-caption"
+					       (:h4 ((:a :class "muted"
+							 :href (get-view-url item))
+						     (str (title item))) )
+					       (:p (str (short-description item))))))))))
+		    (when (current-user)
+		      (str (top-edit-bar (get-object :static-content "index")))))
 		
 	     
-		(:script "$('.carousel').carousel()"))))
+		   (:script "$('.carousel').carousel()"))))
 
 
 ;; (defun store-index-page ()
@@ -122,24 +127,47 @@
 		      featured))
 	  (t featured))))
 
-
-(defun tag-link (tag)
+(defun http-get-link (key value link-text)
+  "Creates a link back to this page with an added GET parameter"
   (with-html-output-to-string (s)
     ((:a :href (url-rewrite:add-get-param-to-url
-		(hunchentoot:script-name*) "tag" (webform tag)))
-     (str (tag-name tag)))))
+		(script-name*) key value))
+     (str link-text))))
 
+
+(defmethod geo-cloud ((item line-item))
+  (get-cloud (get-all-objects :geography) 
+	     (lambda (o) (item-available-in? item o))
+	     "geo"
+	     #'get-identifier
+	     #'geo-name
+	     (lambda (label)
+	       (when-let (geo (get-object :geography label))
+		 (toggle-geo item geo)))))
 
 (defmethod tag-cloud ((cms cms))
-  (with-html-output-to-string (s)
-    (:ul :class "unstyled"
-     (dolist (tag (get-all-objects :tag))
-       (if (tagged? cms tag)
-	   (htm (:li (:strong (str (tag-link tag)))
-		     (:a :href (get-view-url tag) (:i :class "icon-eye-open"))))
-	   (htm (:li (str (tag-link tag))
-		     (:a :href (get-view-url tag) (:i :class "icon-eye-open")))))))))
+  (get-cloud (get-all-objects :tag)
+	     (lambda (o) (tagged? cms o))
+	     "cloudtag"
+	     #'webform
+	     #'tag-name
+	     (lambda (label)
+	       (when-let (tag (get-object :tag label))
+		 (toggle-tag cms tag)))))
 
+(defun get-cloud (objects predicate get-parameter link-writer label-writer &optional toggle-func)
+  (when-let (label (get-parameter get-parameter))
+    (and toggle-func (funcall toggle-func label)))
+  (with-html-output-to-string (s)
+    (:div :class "container-fluid"
+	  (:ul :class "inline-block"
+	       (dolist (o objects)
+		 (let ((link (http-get-link get-parameter
+					    (funcall link-writer o)
+					    (funcall label-writer o))))
+		   (if (funcall predicate o)
+		       (htm (:li (:strong (str link))))
+		       (htm (:li (str link)))))))) ))
 
 
 (defun tags-widget (item)
@@ -295,7 +323,7 @@
 
 (defun find-cms-class (class-string)
   (let ((symbol (safe-read-from-string class-string)))
-;    (hunchentoot:log-message* :info "~S" class-string)
+    (logger :debug "FIND-CMS-CLASS: ~S" class-string)
     (when (and (symbolp symbol)
 	       (subtypep symbol 'cms))
       (make-keyword symbol))))
@@ -386,40 +414,21 @@
 	      :class "nav nav-list")))
 
 
-
-(defun display-item-page (item)
-  (make-page (format nil "Viewing ~A" (title item))
-	     (concatenate 'string
-			  (edit-tabs item "View")
-			  (display-item-content item))
-	     :sidebar (edit-bar "All items")
-	     :end-matter (with-html-output-to-string (s)
-			   (:script "$('.carousel').carousel()"))))
-
+(defun display-item-text (item)
+  (with-html-output-to-string (s)
+    (:h2 (str (title item)))
+    (:p :class "lead" (str (print-price (get-price item))))
+    (str (cart-widget item))
+    ((:p :class "lead") (str (short-description item)))
+    (:p (str (long-description item)))))
 
 (defun display-item-content (item)
-  (with-html-output-to-string (s)
-    ((:div :class "row")
-     ((:div :class "span6")
-      (:h2 (str (title item)))
-      (:p :class "lead" (str (print-price (get-price item))))
-      (str (cart-widget item))
-      ((:p :class "lead") (str (short-description item)))
-      (:p (str (long-description item)))
-
-      ;; reimplement: bundles
-      ;; (when (not (empty? (get-children-qlist item)))
-      ;; 	(htm (:h5 "Contains")
-      ;; 	     (:ul (dolist (i (items (get-children-qlist item)))
-      ;; 		    (destructuring-bind (ii iq) i
-      ;; 		      (htm (:li (fmt "~A x ~A" iq (title ii)))))))))
-      )
-     ((:div :class "span6")
-      (str (carousel "imageCarousel"
+  (grid (6 (display-item-text item)
+	 6 (carousel "imageCarousel"
 		     (get-related-objects item :image) 
 		     (thumbnail-element 500 500)))))
     
-    (:script "$('.carousel').carousel()")))
+;    (:script "$('.carousel').carousel()")))
 
 (defun thumbnail-element (x y)
   (lambda (image)

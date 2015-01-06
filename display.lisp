@@ -3,22 +3,6 @@
 
 (in-package #:shopper)
 
-;; (defun make-page (title body &key sidebar end-matter (sidebar-span 2) (content-span 10)
-;; 		  navigation)
-;;   "each of TITLE BODY and SIDEBAR should return strings.  This
-;; function just makes sure the right components are included."
-;;   (basic-page title
-;; 	      (with-html-output-to-string (s)
-;; 		((:div :class "container")
-;; 		 ((:div :class "row")
-;; 		  ((:div :class (format nil "span~A" sidebar-span))
-;; 		   (when sidebar (htm (str sidebar))))
-;; 		  ((:div :class (format nil "span~A" content-span))
-;; 		   (str body))))
-;; 		(when end-matter (str end-matter)))
-;; 	      navigation))
-
-
 (defun basic-page (title body &optional navigation)
   "each of TITLE BODY and SIDEBAR should return strings.  This
 function just makes sure the right components are included and sets up
@@ -45,34 +29,30 @@ some basic CSS."
   (when-let (banner (get-branding-relation (get-branding *web-store*) :banner))
     (image-element banner)))
 
-(defun standard-page (title headers content)
+(defun standard-page (title headers &rest content)
   (with-html-output-to-string (s nil :prologue t :indent t)
     (:html :lang "en"
 	   (:head (:title (str title))
 		  (:link :href "/s/css/bootstrap.min.css" :rel "stylesheet")
 		  (when headers (str headers)))
 	   (:body :style "padding-bottom:40px;"
-	    (:div :class "container"
-		  (str (get-banner))
-		  (str (main-navigation)))
-	    (:div :class "container"
-		  (if (listp content)
-		      (dolist (item content)
-			(str item))
-		      (str content)))
-	    (:script :src "http://code.jquery.com/jquery-latest.js")
-	    (:script :src "/s/js/bootstrap.min.js")
-	    (:script :type "text/javascript" :src "/js/rte-light-read-only/jquery.rte.js")
-	    (:script :type "text/javascript" (str "$('.rte-zone').rte(\"/js/rte-light-read-only/rte.css\", \"/js/rte-light-read-only/\");"))))))
+		  (:div :class "container"
+			(str (get-banner))
+			(str (main-navigation)))
+		  (dolist (item content)
+		    (htm (:div :class "container"
+			       (str item))))
+		  (:script :src "http://code.jquery.com/jquery-latest.js")
+		  (:script :src "/s/js/bootstrap.min.js")
+		  (:script :type "text/javascript" :src "/js/rte-light-read-only/jquery.rte.js")
+		  (:script :type "text/javascript" (str "$('.rte-zone').rte(\"/js/rte-light-read-only/rte.css\", \"/js/rte-light-read-only/\");"))))))
 
     
 
 
 (defmethod cms-page ((cms cms) content)
-  (standard-page (title cms) (get-headers cms) 
-                 (if (current-user)
-		     (list content (top-edit-bar cms))
-                     content)))
+  (standard-page (title cms) (get-headers cms) content (top-edit-bar cms)))
+
 
 (defmethod object-page ((cms cms))
   (cms-page cms (view-object cms)))

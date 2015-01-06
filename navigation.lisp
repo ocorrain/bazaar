@@ -6,7 +6,6 @@
 (defun main-navigation (&optional navigation)
   (with-html-output-to-string (s)
     (:div :class "navbar"
-	  (:img :src "/images/banner.jpg")
 	  (str (nav-tabs (main-navigation-tabs *web-store*)
 			 navigation :class "nav nav-tabs"))
  	  (str (navigation-cart)))))
@@ -28,7 +27,7 @@
 	  ))
 
 (defun login-tabs ()
-  (when (hunchentoot:session-value :user)
+  (when (session-value :user)
     '(("/edit" . "Edit")
       ("/logout" . "Log out"))))
 

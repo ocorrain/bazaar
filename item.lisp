@@ -62,17 +62,7 @@
 (defmethod render-object ((item line-item))
   (display-item-page item))
 
-(defmethod edit-object/post ((obj line-item) (page (eql :edit)))
-  (update-geos obj (hunchentoot:post-parameters*))
-  (maybe-update obj (fix-alist (hunchentoot:post-parameters*)))
-  (item-form obj))
 
-;; (defmethod edit-object ((obj line-item) (page (eql :contents)))
-
-
-(defmethod edit-object/post ((obj line-item) (page (eql :contents)))
-  (maybe-update-bunpdle obj)
-  (bundle-edit-page obj))
 
 (defmethod get-form ((item (eql :line-item)))
   (item-form))
@@ -85,9 +75,7 @@
 
 
 (defmethod view-object ((obj line-item))
-  (with-html-output-to-string (s)
-    ((:div :class "container")
-     (str (display-item-content obj)))))
+  (display-item-content obj))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -102,21 +90,6 @@
 
 (defmethod get-next-image-stub ((obj cms))
   (make-designator))
-
-;; (defmethod get-edit-view-url ((line-item line-item))
-;;   (restas:genurl 'shopper-edit:r/edit-item/view :sku (sku line-item)))
-
-;; (defmethod get-edit-edit-url ((line-item line-item))
-;;   (restas:genurl 'shopper-edit:r/edit-item/edit :sku (sku line-item)))
-
-;; (defmethod get-edit-image-url ((line-item line-item))
-;;   (restas:genurl 'shopper-edit:r/edit-item/images :sku (sku line-item)))
-
-;; (defmethod get-edit-tags-url ((line-item line-item))
-;;   (restas:genurl 'shopper-edit:r/edit-item/tags :sku (sku line-item)))
-
-;; (defmethod get-edit-contents-url ((line-item line-item))
-;;   (restas:genurl 'shopper-edit:r/edit-item/contents :sku (sku line-item)))
 
 (defun collect-items-with (func)
   (let ((result '()))

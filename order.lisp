@@ -22,7 +22,7 @@
 		:index t)
    (correlation-id :accessor correlation-id :initform nil :index t)
    (payer-id :accessor payer-id :initform nil)
-   (order-postage-price :accessor postage-price :initform 0)
+   (order-postage-price :initarg :postage :accessor postage-price :initform 0)
    (order-price :initarg :order-price :initform 0 :accessor order-price)))
 
 (defmethod add-order-timestamp (order timestamp-id)
@@ -49,7 +49,7 @@
 ;;       (add-order-timestamp order :order-confirmed)
 ;;       (if (paypal-api-call-doexpresscheckoutpayment order)
 ;; 	  (progn
-;; 	    (hunchentoot:delete-session-value :cart)
+;; 	    (delete-session-value :cart)
 ;; 	    (make-page "Order confirmed"
 ;; 		       (with-html-output-to-string (s)
 ;; 			 (:h2 "Your order has been confirmed")
@@ -64,17 +64,17 @@
 ;;     ("/cancel/:(order-ref)")
 ;;   (if-let (order (get-order order-ref))
 ;;     (progn
-;;       (setf (hunchentoot:session-value :cart) (cart order))
+;;       (setf (session-value :cart) (cart order))
 ;;       (ele:drop-instance order)
 ;;       (order-cancelled-page))))
 
 
 ;; (restas:define-route order/cancel/paypal
 ;;     ("/cancel")
-;;   (if-let (token (hunchentoot:get-parameter "token"))
+;;   (if-let (token (get-parameter "token"))
 ;;     (if-let (order (get-order-by-gateway-ref token))
 ;;       (progn
-;; 	(setf (hunchentoot:session-value :cart) (cart order))
+;; 	(setf (session-value :cart) (cart order))
 ;; 	(ele:drop-instance order)
 ;; 	(order-cancelled-page)))))
 
@@ -84,7 +84,7 @@
 ;; 	     (order-manage-page)
 ;; 	     :sidebar (edit-bar "Orders")))
 (defun admin-orders ()
-  (standard-page "Manage orders" nil (list (order-manage-page) (minimal-edit-bar))))
+  (standard-page "Manage orders" nil (order-manage-page) (minimal-edit-bar)))
 
 (defun order-manage-page ()
   (let ((orders (ele:get-instances-by-class 'order)))
@@ -109,28 +109,27 @@
   (local-time:universal-to-timestamp (cdar (order-timestamps order))))
 
 (defun order-cancelled-page ()
-  (basic-page "Order cancelled"
-	      (with-html-output-to-string (s)
-		((:div :class "container")
-		 (:h2 "Your order has been cancelled")
-		 (:p "Items from your order have been returned to your shopping cart")
-		 (:hr)
-		 (str (shopping-cart-form (hunchentoot:session-value :cart)))))))
+  (standard-page "Order cancelled" nil
+		 (with-html-output-to-string (s)
+		   ((:div :class "container")
+		    (:h2 "Your order has been cancelled")
+		    (:p "Items from your order have been returned to your shopping cart")
+		    (:hr)
+		    (str (shopping-cart-form (session-value :cart)))))))
 
 (defun check-order (cart customer)
-  (hunchentoot:log-message* :error "Cart: ~S" cart)
-  (values (items cart) nil)
-  ;; (if-let (geo (get-geo-from-country-code (country customer)))
-  ;;   (let ((valid '())
-  ;; 	  (invalid '()))
-  ;;     (dolist (i (items cart))
-  ;; 	(if (item-available-in?
-  ;; 	     (qlist-entry-item i)
-  ;; 	     geo)
-  ;; 	    (push i valid)
-  ;; 	    (push i invalid)))
-  ;;     (values valid invalid)))
-  )
+  (logger :debug "CHECK-ORDER - Cart: ~S" cart)
+  (if-let (geo (get-geo-from-country-code (country customer)))
+    (let ((valid '())
+  	  (invalid '()))
+      (dolist (i (items cart))
+  	(if (item-available-in?
+  	     (qlist-entry-item i)
+  	     geo)
+  	    (push i valid)
+  	    (push i invalid)))
+      (values valid invalid))))
+
 
 (defmethod get-all-objects ((order (eql :order)))
   (ele:get-instances-by-class 'order);;  (let ((orders '()))
@@ -148,7 +147,8 @@
   (reduce reducer (mapcar accessor list)))
 
 (defun total-price (reified-cart)
-  (mapreduce reified-cart #'fourth #'+))
+  (mapreduce reified-cart (lambda (item)
+			    (* (third item) (fourth item))) #'+))
 
 (defun total-weight (reified-cart)
   (mapreduce reified-cart #'fifth #'+))
@@ -157,41 +157,56 @@
   (with-slots (reified-cart customer order-number) order
     (standard-page (format nil "Order: ~A" (order-number order))
 		   nil
-		   (list (display-order order)
-			 (minimal-edit-bar)))))
+		   (display-order order)
+		   (minimal-edit-bar))))
 
 (defun display-order (order)
-  (with-slots (reified-cart customer order-number) order
-    (with-html-output-to-string (s)
-      (:h2 (fmt "Order: ~A" order-number))
-      (:p :class "text-right" (str (display-customer-address customer)))
-      (:hr)
-      (:table :class "table"
-	      (:thead
-	       (:tr (:th "SKU")
-		    (:th "Quantity")
-		    (:th "Title")
-		    (:th "Price")
-		    (:th "Weight")))
-	      (:tfoot
-	       (:tr (:th "")
-		    (:th "")
-		    (:th "TOTAL")
-		    (:th (str (print-price (total-price reified-cart))))
-		    (:th (str (total-weight reified-cart)))))
-	      (:tbody
-	       (dolist (i reified-cart)
-		 (htm (:tr
-		       (destructuring-bind (sku title quantity price weight)
-			   i
-			 (htm (:td (str sku)))
-			 (htm (:td (str quantity)))
-			 (htm (:td (str title)))
-			 (htm (:td (str (print-price price))))
-			 (htm (:td (str weight)))))) ))))))
+  (with-slots (reified-cart customer order-number order-postage-price) order
+    (destructuring-bind (postage-provider . postage-cost) order-postage-price
+      (with-html-output-to-string (s)
+	(:pre (describe reified-cart s))
+	(:h2 (fmt "Order: ~A" order-number))
+	(:p :class "text-right" (str (display-customer-address customer)))
+	(:hr)
+	(:table :class "table"
+		(:thead
+		 (:tr (:th "SKU")
+		      (:th "Title")
+		      (:th "Price")
+		      (:th "Quantity")
+		      (:th "Weight")))
+		(:tfoot
+		 (:tr (:th "")
+		      (:th "")
+		      (:th "Subtotal")
+		      (:th (str (print-price (total-price reified-cart))))
+		      (:th (str (total-weight reified-cart))))
+		 (:tr (:th "")
+		      (:th (str postage-provider))
+		      (:th "Postage")
+		      (:th (str (print-price postage-cost)))
+		      (:th ""))
+		 (:tr (:th "")
+		      (:th "")
+		      (:th "TOTAL")
+		      (:th (str (print-price (+ postage-cost (total-price reified-cart)))))
+		      (:th "")))
+		(:tbody
+		 (dolist (i reified-cart)
+		   (htm (:tr
+			 (destructuring-bind (sku title quantity price weight)
+			     i
+			   (htm (:td (str sku)))
+			   (htm (:td (str title)))
+			   (htm (:td (str (print-price price))))
+			   (htm (:td (str quantity)))
+			   (htm (:td (str weight)))))) )))))))
+
 		    
 (defun view-completed-order ()
-  (when-let (order (hunchentoot:session-value :last-order))
+  (when-let (order (session-value :last-order))
     (standard-page "Order placed.  Thank you" nil
+		   (with-html-output-to-string (s)
+		     (str (post-parameters*)))
 		   (display-order order))))
 

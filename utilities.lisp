@@ -9,7 +9,7 @@
 (defmacro with-class ((obj string) &body body)
   (let ((g (gensym)))
     `(let ((,g (read-from-string ,string)))
-       (hunchentoot:log-message* :info "~S ~S" ,obj ,string)
+       (logger :info "WITH-CLASS - ~S ~S" ,obj ,string)
        (if (and (symbolp ,g) (subtypep ,g 'cms))
 	   (let ((,obj ,g))
 	     (progn ,@body))

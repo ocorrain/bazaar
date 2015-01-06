@@ -34,16 +34,9 @@
 (defmethod get-edit-tabs ((geo geography))
   '(:countries :postage-rates))
 
-(defmethod edit-object/post ((geo geography) (page (eql :countries)))
-  (hunchentoot:log-message* :error "in edit-object/post geo")
-  (setf (geo-members geo)
-	(remove-if-not (lambda (p)
-			   (get-country-info-from-iso-code p))
-			 (mapcar #'car (hunchentoot:post-parameters*))))
-  (geo-form geo))
 
 ;; (defmethod edit-object ((geo geography) (page (eql :postage-rates)))
-;;   (geo-postage-page geo (hunchentoot:get-parameters*)))
+;;   (geo-postage-page geo (get-parameters*)))
 (defmethod view-object ((obj geography))
   (with-html-output-to-string (s)
     (:h1 (fmt "Geography: ~A" (geo-name obj)))
@@ -60,10 +53,10 @@
 		(htm (:tr (:td "") (:td (fmt "~Ag" (second rate))) (:td (str (print-price (first rate)))))))))))
 
 (defmethod edit-object ((obj geography))
-  (when-let (params (fix-alist (hunchentoot:post-parameters*)))
+  (when-let (params (fix-alist (post-parameters*)))
     (maybe-update obj params))
   (maybe-update-providers obj)
-  (let* ((p (hunchentoot:get-parameters*))
+  (let* ((p (get-parameters*))
 	 (countries-pane (if p "tab-pane" "tab-pane active"))
 	 (providers-pane (if p "tab-pane active" "tab-pane"))
 	 (countries-tab (if p "" "active"))
@@ -147,7 +140,7 @@ in that geo"
 		(mapcar (compose (lambda (geo-label)
 				   (ele:get-instance-by-value 'geography
 							      'geography-name geo-label))
-				 #'hunchentoot:url-decode
+				 #'url-decode
 				 (lambda (name)
 				   (subseq name 2))
 				 #'car)
@@ -435,7 +428,7 @@ in that geo"
 (defun geo-form-page (geoid &optional parameters)
   (when-let (geo (ele:get-instance-by-value 'geography
 					    'geography-name
-					    (hunchentoot:url-decode geoid)))
+					    (url-decode geoid)))
     (when parameters
       (setf (geo-members geo)
 	    (remove-if-not (lambda (p)
@@ -491,42 +484,42 @@ in that geo"
 	      (str (postage-rows (provider-name p)
 				 (get-postage-rates p)))))))))
 
-(defun maybe-update-providers (geo)
-  (hunchentoot:log-message* :error "maybe-update-providers")
-  (when-let (parameters (hunchentoot:get-parameters*))
+(defun maybe-update-providers (geo &optional (parameters (get-parameters*)))
+  (logger :debug "MAYBE-UPDATE-PROVIDERS - geo - ~S ; parameters - ~S" geo parameters)
+  (when parameters 
     (flet ((get-parameter (p) (cdr (assoc p parameters :test #'string-equal)))
-	 (get-integer (str) (ignore-errors (parse-integer str :junk-allowed t))))
-    (when-let* ((provider-name (get-parameter "provider"))
-	      (provider-object (find provider-name (geo-providers geo)
-				     :key #'provider-name :test #'string-equal)))
-    (when-let* ((provider-delete (get-parameter "delete"))
-		(delete-number (get-integer provider-delete)))
-      (setf (items provider-object)
-	    (remove delete-number (items provider-object)
-		    :key #'provider-entry-weight)))
-    (when-let* ((provider-weight (get-parameter "weight"))
-		(provider-price (get-parameter "price"))
-		(weight (get-integer provider-weight))
-		(price (get-integer provider-price)))
-      (setf (items provider-object)
-	    (cons (list price weight)
-		  (remove weight (items provider-object)
-			  :key #'provider-entry-weight)))
-      (set-item-quantity price provider-object weight)))
-
-  (when-let ((new-provider (get-parameter "newprovider")))
-    (unless (find new-provider (geo-providers geo)
-		  :key #'provider-name :test #'string-equal)
-      (push (make-instance 'provider :name new-provider) (geo-providers geo))))
-
-  (when-let ((delete-provider (get-parameter "deleteprovider")))
-    (setf (geo-providers geo) (remove delete-provider (geo-providers geo)
-				      :key #'provider-name :test #'string-equal))))))
+	   (get-integer (str) (ignore-errors (parse-integer str :junk-allowed t))))
+      (when-let* ((provider-name (get-parameter "provider"))
+		  (provider-object (find provider-name (geo-providers geo)
+					 :key #'provider-name :test #'string-equal)))
+	(when-let* ((provider-delete (get-parameter "delete"))
+		    (delete-number (get-integer provider-delete)))
+	  (setf (items provider-object)
+		(remove delete-number (items provider-object)
+			:key #'provider-entry-weight)))
+	(when-let* ((provider-weight (get-parameter "weight"))
+		    (provider-price (get-parameter "price"))
+		    (weight (get-integer provider-weight))
+		    (price (get-integer provider-price)))
+	  (setf (items provider-object)
+		(cons (list price weight)
+		      (remove weight (items provider-object)
+			      :key #'provider-entry-weight)))
+	  (set-item-quantity price provider-object weight)))
+    
+      (when-let ((new-provider (get-parameter "newprovider")))
+	(unless (find new-provider (geo-providers geo)
+		      :key #'provider-name :test #'string-equal)
+	  (push (make-instance 'provider :name new-provider) (geo-providers geo))))
+    
+      (when-let ((delete-provider (get-parameter "deleteprovider")))
+	(setf (geo-providers geo) (remove delete-provider (geo-providers geo)
+					  :key #'provider-name :test #'string-equal))))))
 
 ;; (defun geo-postage-page (geoid &optional parameters)
 ;;   (when-let (geo (ele:get-instance-by-value 'geography
 ;; 					    'geography-name
-;; 					    (hunchentoot:url-decode geoid)))
+;; 					    (url-decode geoid)))
 ;;     (flet ((postage-rows (provider-name rates)
 ;; 	     (with-html-output-to-string (s)
 ;; 	       (dolist (rate rates)
@@ -612,16 +605,15 @@ in that geo"
 
 ;; (defun get-geo-postage-url (geo)
 ;;   (restas:genurl 'shopper-edit:geo/edit/postage
-;; 		 :geoid (hunchentoot:url-encode (geo-name geo))))
+;; 		 :geoid (url-encode (geo-name geo))))
 
 ;; (defun get-geo-delete-url (geo)
 ;;   (restas:genurl 'shopper-edit:geo/delete
-;; 		 :geoid (hunchentoot:url-encode (geo-name geo))))
+;; 		 :geoid (url-encode (geo-name geo))))
 
 
 
 (defun geo-form (&optional geo)
-  (hunchentoot:log-message* :debug "Geo form")
   (with-html-output-to-string (s nil :indent t)
     ((:form :action (if geo
 			(get-edit-url geo)
@@ -657,16 +649,20 @@ in that geo"
 
 ;; FIXME
 (defun item-available-in? (item geo)
-  t;; (member geo (geographies item))
-  )
+  (member geo (geographies item)))
+
 
 
 
 (defun postage-options (cart customer)
   (when-let (geo (get-geo-from-country-code (country customer)))
+    (logger :debug "Got geo: ~S" geo)
     (when-let (rates (get-applicable-postage-rates
-		    (get-weight cart)
-		    geo))
+		      (get-weight cart)
+		      geo))
       (sort rates #'< :key #'cdr))))
 
-
+(defun toggle-geo (item geo)
+  (if (item-available-in? item geo)
+      (setf (geographies item) (remove geo (geographies item)))
+      (push geo (geographies item))))

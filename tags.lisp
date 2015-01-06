@@ -38,9 +38,6 @@
     (when-let (thumbs (remove-if-not #'published (get-tagged-objects tag)))
       (str (thumbnails thumbs #'render-thumb)))))
 
-(defmethod edit-object/post ((tag tag) (page (eql :edit)))
-  (maybe-update tag (fix-alist (hunchentoot:post-parameters*)))
-  (edit-object tag :edit))
 
 (defmethod title ((tag tag))
   (tag-name tag))
@@ -198,3 +195,7 @@
       (dolist (object objects)
 	(unrelate object obj role)))))
 
+(defun toggle-tag (obj tag)
+  (if (tagged? obj tag)
+      (untag-item obj tag)
+      (tag-item obj tag)))

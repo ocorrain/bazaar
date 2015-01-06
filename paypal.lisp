@@ -146,7 +146,7 @@
 
 (defun paypal-redirect-url (order)
   (format nil "~A?cmd=_express-checkout&token=~A"
-	  *paypal-redirect-url* (hunchentoot:url-encode (gateway-ref order))))
+	  *paypal-redirect-url* (url-encode (gateway-ref order))))
 
 (defun paypal-api-call (parameters)
   (multiple-value-bind (body status-code headers uri stream must-close reason-phrase)
@@ -165,7 +165,7 @@
   (mapcar (lambda (kv)
 	    (cl-ppcre:register-groups-bind (key value)
 		("(\\w+)=(.*)" kv)
-	      (cons key (hunchentoot:url-decode value))))
+	      (cons key (url-decode value))))
 	  (cl-ppcre:split "&" response-string)))
 
 (defun get-pp-value (key decoded-response)
