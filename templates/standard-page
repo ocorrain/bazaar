@@ -1,0 +1,23 @@
+<html lang="en">
+
+  <head>
+    <title><!-- TMPL_VAR title --></title>
+    <link href="/s/css/bootstrap.min.css" rel="stylesheet">
+    <!-- TMPL_VAR headers -->
+  </head>
+
+  <body style="padding-bottom:40px">
+    <div class="container">
+      <!-- TMPL_VAR banner -->
+      <!-- TMPL_VAR nav -->
+      <!-- TMPL-VAR content -->
+    </div>
+    <script src="http://code.jquery.com/jquery-latest.js" />
+    <script src="/s/js/bootstrap.min.js" />
+    <script type="text/javascript" src="/js/rte-light-read-only/jquery.rte.js" />
+    <script type="text/javascript">
+      $('.rte-zone').rte("/js/rte-light-read-only/rte.css",
+      "/js/rte-light-read-only/");
+    </script>
+  </body>
+</html>

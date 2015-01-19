@@ -1,0 +1,47 @@
+<div class="shopping-cart">
+  <h3>Shopping cart</h3>
+  <p>These are the items in your shopping cart.  You can edit the number
+    of each item by entering the quantity beside the item and clicking
+    'Update'.  To remove an item, set its quantity to zero.
+  </p>
+  <dl class="dl-horizontal">
+    <dt>Total price</dt>
+    <dd><!-- TMPL_VAR total-price --></dd>
+    <dt>Total weight</dt>
+    <dd><!-- TMPL_VAR total-weight --></dd>
+  </dl>
+
+  <!-- TMPL_IF items -->
+  <a href="/enter-details" class="pull right btn btn-primary">
+    Enter details & check out
+  </a>
+
+  <form class="form-horizontal" action="/shopping-cart" method="post">
+    <button type-"submit" class="btn pull-left">
+      Update totals
+    </button>
+    <hr>
+
+    <!-- TMPL_LOOP items -->
+    <div class="row">
+      <div class="span2">
+	<input type="text" class="input-mini"
+	       name="<!-- TMPL_VAR sku -->"
+	       value="<!-- TMPL_VAR quantity -->">
+      </div>
+      <div class="span10">
+	<h5>
+	  <a href="<!-- TMPL_VAR view-url -->">
+	    <!-- TMPL_VAR item-title -->
+	  </a>
+	</h5>
+	<p><!-- TMPL_VAR item-description --></p>
+	<p><em>Item price: </em><!-- TMPL_VAR item-price --></p>
+	<!-- /TMPL_LOOP -->
+      </div>
+    </div>
+  </form>
+  <!-- /TMPL_ELSE -->
+  <p>Your shopping cart is empty</p>
+  <!-- /TMPL_IF -->
+</div>
