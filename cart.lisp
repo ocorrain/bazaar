@@ -225,8 +225,9 @@
 	      :data-email (email customer)
 	      :data-description (format nil "~A items (~A)" (reduce #'+ (mapcar #'second (items cart)))
 					(print-price (get-price cart)))
-	      :data-image (image-web-path (get-branding-relation (get-branding *web-store*)
-								 :thumbnail))
+	      :data-image (when-let (br (get-branding-relation (get-branding *web-store*)
+                                                               :thumbnail))
+                            (image-web-path br)) 
 	      :data-currency "EUR"
 	      :data-label label)))))
 
