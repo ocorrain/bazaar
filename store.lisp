@@ -150,7 +150,7 @@
 	item))
 
 (defun get-twitter-bootstrap-path ()
-  #p"/home/ocorrain/dovinia/files/bootstrap/")
+  (pathname (concatenate 'string (files-path *web-store*) "/bootstrap/")))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
