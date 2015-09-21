@@ -21,6 +21,13 @@
                    :webform  (get-param :webform) 
                    :appears-in-menu  (get-param :appears-in-menu))))
 
+(defmethod import-object ((obj (eql :static-content)) spec)
+  (flet ((get-param (p) (cdr (assoc p spec))))
+    (make-instance 'static-content
+                   :title (get-param :title)
+                   :content (get-param :content)
+                   :appears-in-menu (get-param :appears-in-menu))))
+
 (defmethod import-object ((obj (eql :provider)) spec)
   (flet ((get-param (p) (cdr (assoc p spec))))
     (make-instance 'provider

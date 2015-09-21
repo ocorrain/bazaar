@@ -13,6 +13,10 @@
   (with-slots (items provider-name) obj
       (plist-alist (list :items items :provider-name provider-name))))
 
+(defmethod json-export ((obj static-content))
+  (with-slots (title content appears-in-menu) obj
+    (plist-alist (list :title title :content content :appears-in-menu appears-in-menu))))
+
 (defmethod json-export ((obj user))
   (with-slots (
                USERNAME    
@@ -114,7 +118,7 @@
 
 (defun json-export-all ()
   (let ((ht (make-hash-table)))
-    (dolist (sym '(line-item tag geography provider web-store))
+    (dolist (sym '(line-item tag geography provider web-store static-content))
       (setf (gethash sym ht )
             (mapcar #'json-export (ele:get-instances-by-class sym))))
     
