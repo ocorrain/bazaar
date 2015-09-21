@@ -23,7 +23,8 @@
 	       :trivial-shell
 	       :uuid
 	       :cl-stripe
-	       :relations)
+	       :relations
+               :cl-json)
   :components ((:file "package")
 	       (:file "specials")
 	       (:file "grid")
@@ -53,7 +54,9 @@
 	       (:file "display")
 	       (:file "navigation")
 	       (:file "pages")
-	       (:file "order")))
+	       (:file "order")
+               (:file "import")
+               (:file "export")))
 
 (asdf:defsystem :shopper-test
   :components ((:module "test"
