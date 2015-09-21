@@ -39,8 +39,7 @@
   (setf (dispatch-table web-store)
 	(list (create-folder-dispatcher-and-handler "/images/" (image-path web-store))
 	      (create-folder-dispatcher-and-handler "/s/" (get-twitter-bootstrap-path))
-	      (create-folder-dispatcher-and-handler "/js/" 
-								#p"/home/ocorrain/lisp/dev/gallery/js/")
+	      (create-folder-dispatcher-and-handler "/js/" (get-js-path))
 	      (create-regex-dispatcher "^/view/([\\w-]+)/(\\w+)$" #'view)
 	      (create-regex-dispatcher "^/edit/.*$"
 						   (secure-page #'edit :edit-objects))

@@ -90,6 +90,9 @@
 (ele:defpclass provider (quantity-list)
   ((provider-name :initarg :name :accessor provider-name :index t)))
 
+(defmethod get-all-objects ((prov (eql :provider)))
+  (ele:get-instances-by-value 'provider 'store (store-name *web-store*)))
+
 (defun provider-entry-weight (provider-entry)
   (qlist-entry-quantity provider-entry))
 

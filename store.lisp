@@ -150,7 +150,10 @@
 	item))
 
 (defun get-twitter-bootstrap-path ()
-  (pathname (concatenate 'string (files-path *web-store*) "/bootstrap/")))
+  (pathname (format nil "~A/bootstrap/" (namestring (files-path *web-store*)))))
+
+(defun get-js-path ()
+  (pathname (format nil "~A/js/" (namestring (files-path *web-store*)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
