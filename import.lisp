@@ -10,7 +10,8 @@
     (import-class :tag spec)
     (import-class :line-item spec)
     (import-class :provider spec)
-    (import-class :geography spec)))
+    (import-class :geography spec)
+    (import-class :static-content spec)))
 
 
 (defmethod import-object ((obj (eql :tag)) spec)
