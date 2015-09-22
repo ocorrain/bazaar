@@ -17,7 +17,7 @@
 (defun import-image (img item)
   (relate item (make-instance 'image :file img) :image))
 
-(defmethod import-object ((obj (eql :user)) spec)
+(defmethod import-object ((obj (eql :user)) spec )
   (flet ((get-param (p) (cdr (assoc p spec))))
     (make-instance 'user
                    :username (get-param :username)
