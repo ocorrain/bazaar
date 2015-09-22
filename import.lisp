@@ -11,10 +11,19 @@
     (import-class :line-item spec)
     (import-class :provider spec)
     (import-class :geography spec)
-    (import-class :static-content spec)))
+    (import-class :static-content spec)
+    (import-class :user spec)))
 
 (defun import-image (img item)
   (relate item (make-instance 'image :file img) :image))
+
+(defmethod import-object ((obj (eql :user)) spec)
+  (flet ((get-param (p) (cdr (assoc p spec))))
+    (make-instance 'user
+                   :username (get-param :username)
+                   :pwhash  (get-param :pwhash) 
+                   :salt  (get-param :salt) 
+                   :capabilities  (get-param :capabilities))))
 
 (defmethod import-object ((obj (eql :tag)) spec)
   (flet ((get-param (p) (cdr (assoc p spec))))

@@ -118,7 +118,7 @@
 
 (defun json-export-all ()
   (let ((ht (make-hash-table)))
-    (dolist (sym '(line-item tag geography provider web-store static-content))
+    (dolist (sym '(line-item tag geography provider web-store static-content user))
       (setf (gethash sym ht )
             (mapcar #'json-export (ele:get-instances-by-class sym))))
     
