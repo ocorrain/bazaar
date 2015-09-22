@@ -30,7 +30,7 @@
 
 (defun update-branding (branding)
   (simple-add-image "banner" branding :banner)
-  (simple-add-image "favico" branding :favico 32 32)
+  (simple-add-image "favico" branding :favico)
   (simple-add-image "thumbnail" branding :thumbnail 128 128))
 
 

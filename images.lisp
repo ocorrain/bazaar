@@ -129,6 +129,7 @@ thumbnail image.  Calls cl-gd."
 				   :file image-file
 				   :designator stub)))
     (cl-fad:copy-file path (merge-pathnames image-file (image-path *web-store*)))
+    
     (make-thumbnail image-obj
 		    (get-config-option :thumbnail-width)
 		    (get-config-option :thumbnail-height))

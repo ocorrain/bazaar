@@ -34,6 +34,7 @@ some basic CSS."
     (:html :lang "en"
 	   (:head (:title (str title))
 		  (:link :href "/s/css/bootstrap.min.css" :rel "stylesheet")
+                  (:link :rel "shortcut icon" :type "image/x-icon" :href "/favicon.ico")
 		  (when headers (str headers)))
 	   (:body :style "padding-bottom:40px;"
 		  (:div :class "container"

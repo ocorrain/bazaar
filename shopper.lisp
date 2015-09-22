@@ -36,32 +36,41 @@
 
 
 (defmethod set-dispatch-table ((web-store web-store))
-  (setf (dispatch-table web-store)
-	(list (create-folder-dispatcher-and-handler "/images/" (image-path web-store))
-	      (create-folder-dispatcher-and-handler "/s/" (get-twitter-bootstrap-path))
-	      (create-folder-dispatcher-and-handler "/js/" (get-js-path))
-	      (create-regex-dispatcher "^/view/([\\w-]+)/(\\w+)$" #'view)
-	      (create-regex-dispatcher "^/edit/.*$"
-						   (secure-page #'edit :edit-objects))
-	      (create-regex-dispatcher "^/new/([\\w-]+)"
-						   (secure-page #'new :edit-objects))
-	      (create-regex-dispatcher "^/class/([\\w-]+)"
-						   (secure-page #'class-page :edit-objects))
-	      (create-regex-dispatcher "^/login$" #'login-page)
-	      (create-prefix-dispatcher "/add-to-cart" #'add-to-cart)
-	      (create-prefix-dispatcher "/enter-details" #'enter-details)
-	      (create-prefix-dispatcher "/place-order" #'place-order)
-	      (create-prefix-dispatcher "/admin/orders"
-						    (secure-page #'admin-orders :admin-orders))
-	      (create-prefix-dispatcher "/order/complete" #'view-completed-order)
-	      (create-regex-dispatcher "^/admin/view/order/([\\w-]+)$" #'admin-view)
-	      (create-prefix-dispatcher "/admin/edit/store" 
-						    (secure-page #'edit-store-page :admin-store))
-	      (create-prefix-dispatcher "/shopping-cart" #'shopping-cart)
-	      (create-prefix-dispatcher "/process-payment" #'process-payment)
-	      (create-regex-dispatcher "^/logout" #'logout)
-	      (create-regex-dispatcher "^/delete/.*$" #'delete-obj)
-	      (lambda (r) (declare (ignore r)) #'index-page))))
+  (let ((dispatch-table (list (create-folder-dispatcher-and-handler "/images/" (image-path web-store))
+                              (create-folder-dispatcher-and-handler "/s/" (get-twitter-bootstrap-path))
+                              (create-folder-dispatcher-and-handler "/js/" (get-js-path))
+                              (create-regex-dispatcher "^/view/([\\w-]+)/(\\w+)$" #'view)
+                              (create-regex-dispatcher "^/edit/.*$"
+                                                       (secure-page #'edit :edit-objects))
+                              (create-regex-dispatcher "^/new/([\\w-]+)"
+                                                       (secure-page #'new :edit-objects))
+                              (create-regex-dispatcher "^/class/([\\w-]+)"
+                                                       (secure-page #'class-page :edit-objects))
+                              (create-regex-dispatcher "^/login$" #'login-page)
+                              (create-prefix-dispatcher "/add-to-cart" #'add-to-cart)
+                              (create-prefix-dispatcher "/enter-details" #'enter-details)
+                              (create-prefix-dispatcher "/place-order" #'place-order)
+                              (create-prefix-dispatcher "/admin/orders"
+                                                        (secure-page #'admin-orders :admin-orders))
+                              (create-prefix-dispatcher "/order/complete" #'view-completed-order)
+                              (create-regex-dispatcher "^/admin/view/order/([\\w-]+)$" #'admin-view)
+                              (create-prefix-dispatcher "/admin/edit/store" 
+                                                        (secure-page #'edit-store-page :admin-store))
+                              (create-prefix-dispatcher "/shopping-cart" #'shopping-cart)
+                              (create-prefix-dispatcher "/process-payment" #'process-payment)
+                              (create-regex-dispatcher "^/logout" #'logout)
+                              (create-regex-dispatcher "^/delete/.*$" #'delete-obj)
+                              (lambda (r) (declare (ignore r)) #'index-page))))
+    (when-let (favico (get-branding-relation 
+                       (get-branding web-store) :favico))
+      (setf dispatch-table (cons (create-static-file-dispatcher-and-handler
+                                  "/favicon.ico"
+                                  (merge-pathnames (get-file favico) (image-path web-store))
+                                  "image/x-icon")
+                                 dispatch-table)))
+    (setf (dispatch-table web-store) dispatch-table)))
+
+
 
 (defmethod stop :after ((shopper-sites shopper-sites) &key soft)
   (declare (ignore soft))
