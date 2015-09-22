@@ -165,3 +165,13 @@ thumbnail image.  Calls cl-gd."
 
 (defmethod image-web-path ((obj image))
   (format nil "/images/~A" (namestring (get-file obj))))
+
+(defun add-image-from-file (filename)
+  (let* ((type (string-downcase (pathname-type filename)))
+         (stub (make-designator))
+         (image-file (make-pathname :name stub :type type))
+         (image-obj (make-instance 'image
+                                   :file image-file
+                                   :designator stub)))
+    (cl-fad:copy-file filename (merge-pathnames image-file (image-path *web-store*)))
+    image-obj))
