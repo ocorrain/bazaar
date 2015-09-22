@@ -15,7 +15,16 @@
     (import-class :user spec)))
 
 (defun import-image (img item)
-  (relate item (make-instance 'image :file img) :image))
+  (let ((image (make-instance 'image :file img))
+        (name (pathname-name img))
+        (type (pathname-type img)))
+    (relate item image :image)
+    (dolist (image-state (list "small" "thumb" "full"))
+      (let ((thumb (make-instance
+                    'image :file (concatenate 'string name "_" image-state "." type)))
+            (relate-symbol (make-keyword (concatenate 'string "image-" image-state))))
+        (relate image thumb relate-symbol)))))
+  
 
 (defmethod import-object ((obj (eql :user)) spec )
   (flet ((get-param (p) (cdr (assoc p spec))))
