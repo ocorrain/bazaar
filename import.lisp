@@ -22,7 +22,7 @@
     (dolist (image-state (list "small" "thumb" "full"))
       (let ((thumb (make-instance
                     'image :file (concatenate 'string name "_" image-state "." type)))
-            (relate-symbol (make-keyword (concatenate 'string "image-" image-state))))
+            (relate-symbol (make-keyword (string-upcase (concatenate 'string "image-" image-state)))))
         (relate image thumb relate-symbol)))))
   
 
