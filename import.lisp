@@ -53,7 +53,8 @@
                    :name  (get-param :name) 
                    :description  (get-param :description) 
                    :webform  (get-param :webform) 
-                   :appears-in-menu  (get-param :appears-in-menu))))
+                   :appears-in-menu  (get-param :appears-in-menu)
+                   :featured (get-param :featured))))
 
 
 (defmethod import-object ((obj (eql :web-store)) spec)
