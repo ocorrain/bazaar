@@ -16,7 +16,7 @@
 (defmethod get-identifier ((image image))
   (get-designator image))
 
-(defmethod make-thumbnail ((image image) box-x box-y &key (force nil))
+(defmethod make-thumbnail ((image image) box-x box-y &key (force nil) (relation :image-thumb))
   "High level method for making a thumbnail of an image.  Creates the
 thumbnail file and relates it to the base image with
 relationship :thumbnail."
@@ -34,7 +34,7 @@ relationship :thumbnail."
 							      :type image-type)
 					 :designator designator)))
 	  (create-thumbnail source-path dest-path box-x box-y)
-	  (relate image image-obj :thumbnail (list box-x box-y))
+	  (relate image image-obj relation (list box-x box-y))
 	  image-obj))))
 
 
@@ -132,13 +132,17 @@ thumbnail image.  Calls cl-gd."
     
     (make-thumbnail image-obj
 		    (get-config-option :thumbnail-width)
-		    (get-config-option :thumbnail-height))
+		    (get-config-option :thumbnail-height)
+                    :relation :image-thumb)
+    
     (make-thumbnail image-obj
 		    (get-config-option :display-width)
-		    (get-config-option :display-height))
+		    (get-config-option :display-height)
+                    :relation :image-full)
     (make-thumbnail image-obj
 		    (get-config-option :small-width)
-		    (get-config-option :small-height))
+		    (get-config-option :small-height)
+                    :relation :image-small)
     (relate line-item image-obj :image)))
 
 
