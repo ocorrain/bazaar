@@ -1,4 +1,4 @@
-;;; -*- Mode: LISP; Syntax: COMMON-LISP -*-
+;; -*- Mode: LISP; Syntax: COMMON-LISP -*-
 ;;; Copyright (c) 2012, Tiarnán Ó Corráin  All rights reserved.
 
 (in-package #:shopper)
@@ -433,7 +433,7 @@
 (defun thumbnail-element (x y)
   (lambda (image)
     (with-html-output-to-string (s)
-    (let ((thumbnail (car (get-related-objects-by-info image :thumbnail (list x y)))))
+    (let ((thumbnail (car (get-related-objects image :image-full))))
       (htm ((:p :align "center")
 	    (if thumbnail
 		(htm (:img :src (format nil "/images/~A" (namestring (get-file thumbnail)))))
@@ -443,7 +443,7 @@
 (defun thumb (x y)
   (lambda (image)
     (with-html-output-to-string (s)
-      (let ((thumbnail (car (get-related-objects-by-info image :thumbnail (list x y)))))
+      (let ((thumbnail (car (get-related-objects image :image-full))))
 	(if thumbnail
 	    (htm (:img :src (format nil "/images/~A" (namestring (get-file thumbnail)))))
 	    (htm (:img :src (format nil "/images/~A" (namestring (get-file image))) 
