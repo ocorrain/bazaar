@@ -13,6 +13,8 @@
     (import-class :geography spec)
     (import-class :static-content spec)))
 
+(defun import-image (img item)
+  (relate item (make-instance 'image :file img) :image))
 
 (defmethod import-object ((obj (eql :tag)) spec)
   (flet ((get-param (p) (cdr (assoc p spec))))
@@ -81,7 +83,6 @@
                                :published (get-param :published)
                                :image-counter (get-param :image-counter)
                                         ;                   :tags (get-param :tags)
-                               :images (get-param :images)
                                ;; :geographies (get-param :geographies)
                                )))
       (dolist (tag (get-param :tags))
@@ -92,6 +93,8 @@
         (let ((geo-obj (get-geo geo)))
           (when geo-obj
             (push geo-obj (geographies item)))))
+      (dolist (img (get-param :images))
+        (import-image img item))
       item)))
 
 (defmethod import-object ((obj t) spec)

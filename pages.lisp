@@ -94,7 +94,7 @@
 		    ((:div :class "row")
 		     ((:div :class "span6")
 
-		      (when-let (index (get-object :static-content "index"))
+		      (when-let (index (get-object :static-content "aboutus"))
 			(str (content index))))
 		  
 		     ((:div :class "span6")
