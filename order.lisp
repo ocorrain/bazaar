@@ -102,7 +102,7 @@
 	      (htm (:tr (:td (:a :href (get-admin-view-url order) (str order-number)))
 			(:td (str (string-capitalize (symbol-name order-state))))
 			(:td (str (cdr (car order-timestamps))))
-			(:td (str (print-price order-postage-price)))
+			(:td (str (print-price (cdr order-postage-price))))
 			(:td (str (print-price order-price))))))))))))
 
 (defun get-most-recent-order-timestamp (order)
