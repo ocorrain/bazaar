@@ -271,3 +271,9 @@
 
 (defmethod get-all-published-objects (class-name)
   (remove-if-not #'published (get-all-objects class-name)))
+
+(defun store-open (web-store)
+  (or (store-open-p web-store)
+      (ignore-errors
+        (when-let (user (get-logged-in-user))
+          (has-capability :test-store user)))))

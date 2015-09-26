@@ -14,7 +14,7 @@
 		(order-prefix *web-store*))
      (textfield "stripepubkey" s "Stripe Public API key" "Public key" (stripe-public-key *web-store*))
      (textfield "stripekey" s "Stripe Secret API key" "Secret key" (stripe-api-key *web-store*))
-     (checkbox "open" s "Open?" (store-open *web-store*))
+     (checkbox "open" s "Open?" (store-open-p *web-store*))
      (:br)
      (submit-button "Submit" s))))
 

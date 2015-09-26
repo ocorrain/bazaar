@@ -26,7 +26,7 @@
    (audit-path :initarg :audit-path
 	       :initform #p"" :accessor audit-path :type pathname)
    (base-path :initarg :base-path :accessor base-path :type pathname)
-   (open :initarg :open :initform nil :accessor store-open)
+   (open :initarg :open :initform nil :accessor store-open-p)
    (store-type :initarg :store-type :initform :web-store :accessor store-type)
    (store-active-classes :initarg :store-active-classes
 			 :initform '(:line-item :tag :geography :static-content)
