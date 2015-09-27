@@ -180,31 +180,39 @@
 (defun process-payment ()
   (if-let ((stripe-token (parameter "stripeToken"))
 	   (cart (get-cart)))
-    (if-let ((stripe-reply (ignore-errors (stripe:create-charge :amount (+ (get-price cart)
-									   (cdr (postage cart)))
-								:currency "eur"
-								:card stripe-token
-								:api-key (stripe-api-key *web-store*)))))
-      (if-let ((paid (stripe::sstruct-get stripe-reply :paid))
-	       (id (stripe:sstruct-get stripe-reply :id)))
-	(if (eql paid :true)
-	    (let ((order (cart->order cart)))
-	      (setf (session-value :cart) nil)
-	      (setf (session-value :last-order) order)
-	      (setf (correlation-id order) id)
-	      (view-completed-order))
-	    (standard-page "Stripe error" nil
-			   (with-html-output-to-string (s)
-			     (:h1 "Payment error")
-			     (:p "Your payment did not go through.")
-			     (:p (:i (str (stripe:sstruct-get stripe-reply :failure-message)))))))
+    (handler-case
+        (if-let ((stripe-reply (stripe:create-charge :amount (+ (get-price cart)
+                                                                (cdr (postage cart)))
+                                                     :currency "eur"
+                                                     :card stripe-token
+                                                     :api-key (stripe-api-key *web-store*))))
+          (if-let ((paid (stripe::sstruct-get stripe-reply :paid))
+                   (id (stripe:sstruct-get stripe-reply :id)))
+            (if (eql paid :true)
+                (let ((order (cart->order cart)))
+                  (setf (session-value :cart) nil)
+                  (setf (session-value :last-order) order)
+                  (setf (correlation-id order) id)
+                  (view-completed-order))
+                (standard-page "Stripe error" nil
+                               (with-html-output-to-string (s)
+                                 (:h1 "Payment error")
+                                 (:p "Your payment did not go through.")
+                                 (:p (:i (str (stripe:sstruct-get stripe-reply :failure-message)))))))
 	
-	(standard-page "Stripe error" nil
-		       (with-html-output-to-string (s)
-			 (:h1 "Payment error")
-			 (:p "Your payment did not go through.")
-			 (:p (:i "No reply from stripe")))))
-      (setf (return-code*) hunchentoot:+http-service-unavailable+))))
+            (standard-page "Stripe error" nil
+                           (with-html-output-to-string (s)
+                             (:h1 "Payment error")
+                             (:p "Your payment did not go through.")
+                             (:p (:i "No reply from stripe")))))
+          (setf (return-code*) hunchentoot:+http-service-unavailable+))
+      (stripe::stripe-request-failed (r)
+        (standard-page "Stripe error" nil
+                       (with-html-output-to-string (s)
+                         (:h1 "Payment error")
+                         (:p (fmt "Message from Stripe: ~A"
+                                  (stripe::sstruct-get (stripe::stripe-error-reply r) :error :message)))))))))
+
 
 (defun escape-describe (object)
   (with-html-output-to-string (str)

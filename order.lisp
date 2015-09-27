@@ -164,7 +164,7 @@
   (with-slots (reified-cart customer order-number order-postage-price) order
     (destructuring-bind (postage-provider . postage-cost) order-postage-price
       (with-html-output-to-string (s)
-	(:pre (describe reified-cart s))
+	;; (:pre (describe reified-cart s))
 	(:h2 (fmt "Order: ~A" order-number))
 	(:p :class "text-right" (str (display-customer-address customer)))
 	(:hr)
@@ -206,7 +206,6 @@
 (defun view-completed-order ()
   (when-let (order (session-value :last-order))
     (standard-page "Order placed.  Thank you" nil
-		   (with-html-output-to-string (s)
-		     (str (post-parameters*)))
+		   (with-html-output-to-string (s))
 		   (display-order order))))
 
