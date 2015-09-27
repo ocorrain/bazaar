@@ -85,42 +85,6 @@
   (standard-page "Paypal error" nil
 	      (paypal-errors sent received)))
 
-;; (defun index-page ()
-;;   (basic-page (format nil "Welcome to ~A" (store-name *web-store*))
-;; 	      (with-html-output-to-string (s)
-;; 		;; ((:div :class "well")
-;; 					;(:h2 "Featured categories")
-;; 		((:div :class "container")
-;; 		 ((:div :class "row")
-;; 		  ((:div :class "span6")
-;; 		   (:h1 (str (store-name *web-store*)))
-;; 		   (:p "Chocolate. There are few foods that people feel as
-;; 	       	passionate about&mdash;a passion that goes beyond a love
-;; 	       	for the 'sweetness' of most candies or desserts: after
-;; 	       	all, few people crave caramel, whipped cream, or
-;; 	       	bubble gum. Chocolate is, well, different. For the
-;; 	       	true chocoholic, just thinking about chocolate can
-;; 	       	evoke a pleasurable response. You may want to grab a
-;; 	       	bar or make a nice cup of hot cocoa before you begin
-;; 	       	exploring here.")
-;; 		   ;; (:p ((:a :class "btn btn-success btn-large pull-right"
-;; 		   ;; 	    :href "/featured")
-;; 		   ;; 	"See our featured items!"))
-;; 		   )
-;; 		  ((:div :class "span6")
-;; 		   (str (carousel "featuredCarousel"
-;; 				  (get-featured-items 10)
-;; 				  (lambda (item)
-;; 				    (with-html-output-to-string (s)
-;; 				      (str (display-an-image item #'get-full-url))
-;; 				      (:div :class "carousel-caption"
-;; 					    (:h4 ((:a :class "muted"
-;; 						      :href (get-view-url item))
-;; 						  (str (title item))) )
-;; 					    (:p (str (short-description item)))))))))))
-	     
-;; 		(:script "$('.carousel').carousel()"))
-;; 	      "Home"))
 
 (defmethod index-page ()
   (standard-page (format nil "Welcome to ~A" (store-name *web-store*))
@@ -128,10 +92,26 @@
 		 (with-html-output-to-string (s)
 		   ((:div :class "container")
 		    ((:div :class "row")
-		     ((:div :class "span6")
+                     ((:div :class "span6")
+		   (:h1 (str (store-name *web-store*)))
+		   (:p "Chocolate. There are few foods that people feel as
+	       	passionate about&mdash;a passion that goes beyond a love
+	       	for the 'sweetness' of most candies or desserts: after
+	       	all, few people crave caramel, whipped cream, or
+	       	bubble gum. Chocolate is, well, different. For the
+	       	true chocoholic, just thinking about chocolate can
+	       	evoke a pleasurable response. You may want to grab a
+	       	bar or make a nice cup of hot cocoa before you begin
+	       	exploring here.")
+		   ;; (:p ((:a :class "btn btn-success btn-large pull-right"
+		   ;; 	    :href "/featured")
+		   ;; 	"See our featured items!"))
+		   )
+                     
+		     ;; ((:div :class "span6")
 
-		      (when-let (index (get-object :static-content "aboutus"))
-			(str (content index))))
+		     ;;  (when-let (index (get-object :static-content "aboutus"))
+		     ;;    (str (content index))))
 		  
 		     ((:div :class "span6")
 		      (str (carousel "featuredCarousel"
@@ -503,3 +483,43 @@
 		:data-slide "next") (str "&rsaquo;"))))
 	(funcall render-function (first elements)))))
 
+
+
+
+;; (defun index-page ()
+;;   (basic-page (format nil "Welcome to ~A" (store-name *web-store*))
+;; 	      (with-html-output-to-string (s)
+;; 		;; ((:div :class "well")
+;; 					;(:h2 "Featured categories")
+;; 		((:div :class "container")
+;; 		 ((:div :class "row")
+;; 		  ((:div :class "span6")
+;; 		   (:h1 (str (store-name *web-store*)))
+;; 		   (:p "Chocolate. There are few foods that people feel as
+;; 	       	passionate about&mdash;a passion that goes beyond a love
+;; 	       	for the 'sweetness' of most candies or desserts: after
+;; 	       	all, few people crave caramel, whipped cream, or
+;; 	       	bubble gum. Chocolate is, well, different. For the
+;; 	       	true chocoholic, just thinking about chocolate can
+;; 	       	evoke a pleasurable response. You may want to grab a
+;; 	       	bar or make a nice cup of hot cocoa before you begin
+;; 	       	exploring here.")
+;; 		   ;; (:p ((:a :class "btn btn-success btn-large pull-right"
+;; 		   ;; 	    :href "/featured")
+;; 		   ;; 	"See our featured items!"))
+;; 		   )
+;; 		  ((:div :class "span6")
+;; 		   (str (carousel "featuredCarousel"
+;; 				  (get-featured-items 10)
+;; 				  (lambda (item)
+;; 				    (with-html-output-to-string (s)
+;; 				      (str (display-an-image item #'get-full-url))
+;; 				      (:div :class "carousel-caption"
+;; 					    (:h4 ((:a :class "muted"
+;; 						      :href (get-view-url item))
+;; 						  (str (title item))) )
+;; 					    (:p (str (short-description item)))))))))))
+	     
+;; 		(:script "$('.carousel').carousel()"))
+;; 	      "Home"))
+ 

@@ -68,6 +68,12 @@
                                   (merge-pathnames (get-file favico) (image-path web-store))
                                   "image/x-icon")
                                  dispatch-table)))
+    (when-let (static-content (remove-if-not #'appears-in-menu (get-all-objects :static-content)))
+      (dolist (sc static-content)
+        (push (create-prefix-dispatcher (get-link sc)
+                                      (lambda () (view-static-content-page sc)))
+              dispatch-table)))
+    
     (setf (dispatch-table web-store) dispatch-table)))
 
 

@@ -12,7 +12,7 @@
 
 (defmethod main-navigation-tabs ((store-type (eql :web-store)))
   (append (main-nav-tabs)
-					;			     (static-content-nav)
+          (static-content-nav)
 	  (tag->nav (featured-tags))
 	  ;; (nav-dropdown "More Chocolate!"
 	  ;; 		(tag->nav (menu-tags)))

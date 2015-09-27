@@ -28,6 +28,11 @@
 (defmethod get-edit-tabs ((stat static-content))
   '(:view :edit))
 
+(defmethod get-link ((obj static-content))
+  (concatenate 'string "/" (get-identifier obj) ".html"))
+
+(defmethod get-menu-objects ((static (eql :static-content)))
+  (remove-if-not #'appears-in-menu (get-all-published-objects :static-content)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -62,12 +67,10 @@
 ;; 	     (static-content-form)
 ;; 	     :sidebar (edit-bar "")))
 
-;; (defun static-content-nav ()
-;;   (mapcar (lambda (content)
-;; 	    (cons (restas:genurl 'r/view-static-content
-;; 				 :contentform (get-webform (title content)))
-;; 		  (title content)))
-;; 	  (ele:get-instances-by-value 'static-content 'appears-in-menu t)))
+(defun static-content-nav ()
+  (mapcar (lambda (content)
+            (cons (get-link content) (title content)))
+	  (get-menu-objects :static-content)))
 
 
 
@@ -112,3 +115,4 @@
 
 (defmethod view-object ((obj static-content))
   (view-static-content obj))
+
