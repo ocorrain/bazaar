@@ -149,11 +149,11 @@
   (setf (ele:get-value (sku item) (items *web-store*))
 	item))
 
-(defun get-twitter-bootstrap-path ()
-  (pathname (format nil "~A/bootstrap/" (namestring (files-path *web-store*)))))
+(defun get-twitter-bootstrap-path (web-store)
+  (pathname (format nil "~A/bootstrap/" (namestring (files-path web-store)))))
 
-(defun get-js-path ()
-  (pathname (format nil "~A/js/" (namestring (files-path *web-store*)))))
+(defun get-js-path (web-store)
+  (pathname (format nil "~A/js/" (namestring (files-path web-store)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

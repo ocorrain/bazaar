@@ -37,8 +37,8 @@
 
 (defmethod set-dispatch-table ((web-store web-store))
   (let ((dispatch-table (list (create-folder-dispatcher-and-handler "/images/" (image-path web-store))
-                              (create-folder-dispatcher-and-handler "/s/" (get-twitter-bootstrap-path))
-                              (create-folder-dispatcher-and-handler "/js/" (get-js-path))
+                              (create-folder-dispatcher-and-handler "/s/" (get-twitter-bootstrap-path web-store))
+                              (create-folder-dispatcher-and-handler "/js/" (get-js-path web-store))
                               (create-regex-dispatcher "^/view/([\\w-]+)/(\\w+)$" #'view)
                               (create-regex-dispatcher "^/edit/.*$"
                                                        (secure-page #'edit :edit-objects))
