@@ -90,7 +90,7 @@
   (let ((orders (ele:get-instances-by-class 'order)))
     (with-html-output-to-string (s)
       ((:div :class "row")
-       (:table :class "table"
+       (:table :class "table table-bordered table-striped table-condensed"
 	(:tr (:th "Order number")
 	     (:th "State")
 	     (:th "Timestamps")
